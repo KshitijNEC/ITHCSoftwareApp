@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        DEPLOY_DIR = 'C:\\opt\\ithcapp'
-        VENV_PATH = "${DEPLOY_DIR}\\venv"
+        DEPLOY_DIR = '/opt/ithcapp'
+        VENV_PATH = "${DEPLOY_DIR}/venv"
     }
 
     stages {
@@ -15,17 +15,19 @@ pipeline {
 
         stage('Setup Environment') {
             steps {
-                bat """
-                    python -m venv ${VENV_PATH}
-                    call ${VENV_PATH}\\Scripts\\activate
+                script {
+                    sh """
+                        python3 -m venv ${VENV_PATH}
+                        source ${VENV_PATH}/bin/activate
 
-                    cd backend
-                    pip install -r requirements.txt
-                    pip install pytest-cov pytest-html
+                        cd backend
+                        pip install -r requirements.txt
+                        pip install pytest-cov pytest-html
 
-                    cd ..\\frontend
-                    npm install
-                """
+                        cd ../frontend
+                        npm install
+                    """
+                }
             }
         }
 
@@ -33,20 +35,22 @@ pipeline {
             parallel {
                 stage('Backend Tests') {
                     steps {
-                        bat """
-                            call ${VENV_PATH}\\Scripts\\activate
-                            cd backend
-                            python -m pytest --cov=. --cov-report=html:coverage-report --html=test-report.html || exit /b 0
-                        """
+                        script {
+                            sh """
+                                source ${VENV_PATH}/bin/activate
+                                cd backend
+                                python3 -m pytest --cov=. --cov-report=html:coverage-report --html=test-report.html || exit 0
+                            """
+                        }
                     }
                     post {
                         always {
-                            publishHTML([
+                            publishHTML([ 
                                 allowMissing: true,
                                 alwaysLinkToLastBuild: true,
                                 keepAll: true,
                                 reportDir: 'backend',
-                                reportFiles: 'test-report.html,coverage-report\\index.html',
+                                reportFiles: 'test-report.html,coverage-report/index.html',
                                 reportName: 'Backend Test Report'
                             ])
                         }
@@ -55,19 +59,21 @@ pipeline {
 
                 stage('Frontend Tests') {
                     steps {
-                        bat """
-                            cd frontend
-                            npm test -- --coverage --ci --reporters=default --reporters=jest-junit || exit /b 0
-                        """
+                        script {
+                            sh """
+                                cd frontend
+                                npm test -- --coverage --ci --reporters=default --reporters=jest-junit || exit 0
+                            """
+                        }
                     }
                     post {
                         always {
-                            junit 'frontend\\junit.xml'
-                            publishHTML([
+                            junit 'frontend/junit.xml'
+                            publishHTML([ 
                                 allowMissing: true,
                                 alwaysLinkToLastBuild: true,
                                 keepAll: true,
-                                reportDir: 'frontend\\coverage',
+                                reportDir: 'frontend/coverage',
                                 reportFiles: 'index.html',
                                 reportName: 'Frontend Coverage Report'
                             ])
@@ -79,10 +85,22 @@ pipeline {
 
         stage('Build Frontend') {
             steps {
-                bat """
-                    cd frontend
-                    npm run build
-                """
+                script {
+                    sh """
+                        cd frontend
+                        npm run build
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to VM') {
+            steps {
+                script {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no user@your-ubuntu-vm 'bash -s' < deploy_script.sh
+                    """
+                }
             }
         }
     }

@@ -16,7 +16,7 @@ pipeline {
         
         stage('Setup Environment') {
             steps {
-                bat '''
+                sh '''
                     # Create Python virtual environment
                     python3 -m venv ${VENV_PATH}
                     . ${VENV_PATH}/bin/activate
@@ -37,7 +37,7 @@ pipeline {
             parallel {
                 stage('Backend Tests') {
                     steps {
-                        bat '''
+                        sh '''
                             . ${VENV_PATH}/bin/activate
                             cd backend
                             python -m pytest --cov=. --cov-report=html:coverage-report --html=test-report.html || true
@@ -60,7 +60,7 @@ pipeline {
                 
                 stage('Frontend Tests') {
                     steps {
-                        bat '''
+                        sh '''
                             cd frontend
                             npm test -- --coverage --ci --reporters=default --reporters=jest-junit || true
                         '''
@@ -84,7 +84,7 @@ pipeline {
         
         stage('Build Frontend') {
             steps {
-                bat '''
+                sh '''
                     cd frontend
                     npm run build
                 '''
@@ -93,7 +93,7 @@ pipeline {
         
         stage('Deploy to DevTest') {
             steps {
-                bat '''
+                sh '''
                     # Ensure target directory exists
                     sudo mkdir -p ${DEPLOY_DIR}
                     sudo chown -R jenkins:jenkins ${DEPLOY_DIR}

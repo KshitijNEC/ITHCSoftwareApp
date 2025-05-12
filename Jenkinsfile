@@ -8,12 +8,12 @@ pipeline {
         SSH_KEY_CREDENTIALS_ID = 'jenkins_vm_ssh_key'
     }
 
-    stage('Clone Repository') {
-    steps {
-        git branch: 'main', credentialsId: 'jenkins_github_cred', url: 'https://github.com/KshitijNEC/ITHCSoftwareApp.git'
-    }
-}
-
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git branch: 'main', credentialsId: 'jenkins_github_cred', url: 'https://github.com/KshitijNEC/ITHCSoftwareApp.git'
+            }
+        }
 
         stage('Setup Backend Dependencies') {
             steps {

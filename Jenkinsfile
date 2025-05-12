@@ -4,6 +4,10 @@ pipeline {
     environment {
         SOURCE_DIR = 'C:\\Users\\kshitij.waikar\\ITHCSoftwareApp'
         ZIP_PATH = 'C:\\ProgramData\\Jenkins\\.jenkins\\workspace\\ITHCapp\\ITHCSoftwareApp.zip'
+        VM_USER = 'kshitij-necsws'
+        VM_HOST = '10.102.192.172'
+        REMOTE_DIR = '/application_deploy/zips'
+        VM_PASSWORD = 'YOUR_PASSWORD' // replace this securely
     }
 
     stages {
@@ -19,11 +23,9 @@ pipeline {
                 @echo off
                 setlocal
 
-                REM Set the paths
                 set "SOURCE_DIR=%SOURCE_DIR%"
                 set "ZIP_PATH=%ZIP_PATH%"
 
-                REM Use PowerShell to zip the folder with retries
                 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
                 "$attempts = 5; $success = $false; while ($attempts -gt 0 -and -not $success) { ^
                     try { ^
@@ -41,6 +43,38 @@ pipeline {
                 endlocal
                 '''
             }
+        }
+
+        stage('Copy ZIP to Linux VM') {
+            steps {
+                bat '''
+                @echo off
+                setlocal
+
+                set "ZIP_PATH=%ZIP_PATH%"
+                set "VM_USER=%VM_USER%"
+                set "VM_HOST=%VM_HOST%"
+                set "REMOTE_DIR=%REMOTE_DIR%"
+                set "VM_PASSWORD=%VM_PASSWORD%"
+
+                REM Use pscp to copy ZIP to the Linux VM (you need pscp from PuTTY installed and in PATH)
+                echo y | pscp -pw %VM_PASSWORD% "%ZIP_PATH%" %VM_USER%@%VM_HOST%:%REMOTE_DIR%/
+
+                endlocal
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
         }
     }
 }

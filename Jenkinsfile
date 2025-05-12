@@ -1,132 +1,83 @@
 pipeline {
-    agent none
+    agent { label 'linux' }
 
     environment {
+        VENV_PATH = '.venv'
+        REPORT_PATH = 'backend/test-report.html'
+        DEPLOY_USER = 'kshitij-necsws'              // CHANGE THIS
+        DEPLOY_HOST = 'kshitij-necsws'        // CHANGE THIS
         DEPLOY_DIR = '/opt/ithcapp'
-        VENV_PATH = "${DEPLOY_DIR}/venv"
+        RECIPIENTS = 'kshitj.waikar@necsws.com' // CHANGE THIS
     }
 
     stages {
-
-        stage('Zip Project on Windows') {
-            agent any  // Will run on any available agent (Windows assumed here)
+        stage('Checkout Code') {
             steps {
-                bat '''
-                @echo off
-                setlocal
-
-                set "SOURCE_DIR=C:\\Users\\kshitij.waikar\\ITHCSoftwareApp"
-                set "ZIP_PATH=C:\\ProgramData\\Jenkins\\.jenkins\\workspace\\ITHCapp\\ITHCSoftwareApp.zip"
-
-                powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-                "$attempts = 5; $success = $false; while ($attempts -gt 0 -and -not $success) { ^
-                    try { ^
-                        if (Test-Path '%ZIP_PATH%') { Remove-Item -Force '%ZIP_PATH%' } ^
-                        Compress-Archive -Path '%SOURCE_DIR%\\*' -DestinationPath '%ZIP_PATH%' -Force; ^
-                        $success = $true; ^
-                    } catch { ^
-                        Write-Host 'Zip failed, retrying in 5 seconds...'; ^
-                        Start-Sleep -Seconds 5; ^
-                        $attempts--; ^
-                    } ^
-                }; ^
-                if (-not $success) { throw 'Failed to create zip after multiple attempts.' }"
-
-                endlocal
-                '''
+                checkout scm
             }
         }
 
-        stage('Checkout & Deploy on Linux') {
-            agent { label 'linux' }  // Requires a Linux agent with 'linux' label
-            stages {
+        stage('Setup Python Environment') {
+            steps {
+                sh """
+                    python3 -m venv ${VENV_PATH}
+                    source ${VENV_PATH}/bin/activate
+                    pip install --upgrade pip
+                    pip install -r backend/requirements.txt
+                    pip install pytest pytest-html
+                """
+            }
+        }
 
-                stage('Checkout') {
-                    steps {
-                        checkout scm
-                    }
+        stage('Run Unit Tests') {
+            steps {
+                sh """
+                    source ${VENV_PATH}/bin/activate
+                    cd backend
+                    pytest --html=test-report.html || exit 1
+                """
+            }
+            post {
+                always {
+                    mail to: "${RECIPIENTS}",
+                         subject: "Test Report: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                         body: "Find attached the test report for ${env.JOB_NAME}.",
+                         attachLog: true,
+                         attachmentsPattern: "**/backend/test-report.html"
                 }
+            }
+        }
 
-                stage('Setup Environment') {
-                    steps {
-                        sh """
-                            python3 -m venv ${VENV_PATH}
-                            source ${VENV_PATH}/bin/activate
-
-                            cd backend
-                            pip install -r requirements.txt
-                            pip install pytest-cov pytest-html
-
-                            cd ../frontend
-                            npm install
-                        """
-                    }
+        stage('Deploy to Ubuntu VM') {
+            when {
+                expression {
+                    return currentBuild.result == null || currentBuild.result == 'SUCCESS'
                 }
+            }
+            steps {
+                sh """
+                    ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} << 'ENDSSH'
+                        set -e
+                        mkdir -p ${DEPLOY_DIR}
+                        cd ${DEPLOY_DIR}
 
-                stage('Run Tests') {
-                    parallel {
-                        stage('Backend Tests') {
-                            steps {
-                                sh """
-                                    source ${VENV_PATH}/bin/activate
-                                    cd backend
-                                    python3 -m pytest --cov=. --cov-report=html:coverage-report --html=test-report.html || exit 0
-                                """
-                            }
-                            post {
-                                always {
-                                    publishHTML([ 
-                                        allowMissing: true,
-                                        alwaysLinkToLastBuild: true,
-                                        keepAll: true,
-                                        reportDir: 'backend',
-                                        reportFiles: 'test-report.html,coverage-report/index.html',
-                                        reportName: 'Backend Test Report'
-                                    ])
-                                }
-                            }
-                        }
+                        # Clone or pull latest
+                        if [ ! -d ".git" ]; then
+                            git clone https://github.com/your-user/ITHCSoftwareApp.git .
+                        else
+                            git pull origin main
+                        fi
 
-                        stage('Frontend Tests') {
-                            steps {
-                                sh """
-                                    cd frontend
-                                    npm test -- --coverage --ci --reporters=default --reporters=jest-junit || exit 0
-                                """
-                            }
-                            post {
-                                always {
-                                    junit 'frontend/junit.xml'
-                                    publishHTML([ 
-                                        allowMissing: true,
-                                        alwaysLinkToLastBuild: true,
-                                        keepAll: true,
-                                        reportDir: 'frontend/coverage',
-                                        reportFiles: 'index.html',
-                                        reportName: 'Frontend Coverage Report'
-                                    ])
-                                }
-                            }
-                        }
-                    }
-                }
+                        python3 -m venv venv
+                        source venv/bin/activate
+                        pip install --upgrade pip
+                        pip install -r backend/requirements.txt
 
-                stage('Build Frontend') {
-                    steps {
-                        sh """
-                            cd frontend
-                            npm run build
-                        """
-                    }
-                }
-
-                stage('Deploy to VM') {
-                    steps {
-                        sh """
-                            ssh -o StrictHostKeyChecking=no user@your-ubuntu-vm 'bash -s' < deploy_script.sh
-                        """
-                    }
-                }
+                        # Kill old app and start new
+                        pkill -f backend/app.py || true
+                        nohup python3 backend/app.py > app.log 2>&1 &
+                    ENDSSH
+                """
             }
         }
     }
@@ -136,10 +87,10 @@ pipeline {
             cleanWs()
         }
         success {
-            echo 'Pipeline completed successfully!'
+            echo '✅ Deployment succeeded.'
         }
         failure {
-            echo 'Pipeline failed!'
+            echo '❌ Build failed.'
         }
     }
 }

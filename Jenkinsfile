@@ -1,96 +1,175 @@
 pipeline {
-    agent { label 'linux' }
-
+    agent any
+ 
     environment {
-        VENV_PATH = '.venv'
-        REPORT_PATH = 'backend/test-report.html'
-        DEPLOY_USER = 'kshitij-necsws'              // CHANGE THIS
-        DEPLOY_HOST = 'kshitij-necsws'        // CHANGE THIS
-        DEPLOY_DIR = '/opt/ithcapp'
-        RECIPIENTS = 'kshitj.waikar@necsws.com' // CHANGE THIS
+        APP_NAME = 'ithcapp'
+        DEPLOY_DIR = '/application_deploy/deploy_folder'
+        VENV_PATH = "${DEPLOY_DIR}/venv"
+        VM_USER = 'kshitij-necsws'
+        VM_HOST = '10.102.192.172'
+        APP_PATH = '/home/zeeshan/Desktop/deploy_folder'
     }
-
+ 
     stages {
-        stage('Checkout Code') {
+        stage('Checkout') {
             steps {
                 checkout scm
             }
         }
-
-        stage('Setup Python Environment') {
+ 
+        stage('Setup Environment') {
             steps {
-                sh """
-                    python3 -m venv ${VENV_PATH}
-                    source ${VENV_PATH}/bin/activate
-                    pip install --upgrade pip
-                    pip install -r backend/requirements.txt
-                    pip install pytest pytest-html
-                """
-            }
-        }
-
-        stage('Run Unit Tests') {
-            steps {
-                sh """
-                    source ${VENV_PATH}/bin/activate
+                sh '''
+                    python3 -m venv venv
+                    . venv/bin/activate
+ 
                     cd backend
-                    pytest --html=test-report.html || exit 1
-                """
+                    pip install -r requirements.txt
+                    pip install pytest-cov pytest-html
+ 
+                    cd ../frontend
+                    npm install
+                '''
             }
-            post {
-                always {
-                    mail to: "${RECIPIENTS}",
-                         subject: "Test Report: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                         body: "Find attached the test report for ${env.JOB_NAME}.",
-                         attachLog: true,
-                         attachmentsPattern: "**/backend/test-report.html"
+        }
+ 
+        stage('Run Tests') {
+            parallel {
+                stage('Backend Tests') {
+                    steps {
+                        sh '''
+                            . venv/bin/activate
+                            cd backend
+                            pytest
+                            pytest --cov=.
+                            pytest tests/test_software.py
+                            pytest --cov=. --cov-report=html:coverage-report --html=test-report.html || true
+                        '''
+                    }
+                    post {
+                        always {
+                            publishHTML([
+                                allowMissing: true,
+                                alwaysLinkToLastBuild: true,
+                                keepAll: true,
+                                reportDir: 'backend',
+                                reportFiles: 'test-report.html,coverage-report/**',
+                                reportName: 'Backend Test Report',
+                                reportTitles: 'Test Report,Coverage Report'
+                            ])
+                        }
+                    }
+                }
+ 
+                stage('Frontend Tests') {
+                    steps {
+                        sh '''
+                            cd frontend
+                            npm test
+                            npm run test:watch || true
+                            npm run test:coverage || true
+                        '''
+                    }
+                    post {
+                        always {
+                            junit 'frontend/junit.xml'
+                            publishHTML([
+                                allowMissing: true,
+                                alwaysLinkToLastBuild: true,
+                                keepAll: true,
+                                reportDir: 'frontend/coverage',
+                                reportFiles: 'index.html',
+                                reportName: 'Frontend Coverage Report'
+                            ])
+                        }
+                    }
                 }
             }
         }
-
-        stage('Deploy to Ubuntu VM') {
-            when {
-                expression {
-                    return currentBuild.result == null || currentBuild.result == 'SUCCESS'
-                }
-            }
+ 
+        stage('Build Frontend') {
             steps {
-                sh """
-                    ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} << 'ENDSSH'
-                        set -e
-                        mkdir -p ${DEPLOY_DIR}
-                        cd ${DEPLOY_DIR}
-
-                        # Clone or pull latest
-                        if [ ! -d ".git" ]; then
-                            git clone https://github.com/your-user/ITHCSoftwareApp.git .
-                        else
-                            git pull origin main
-                        fi
-
+                sh '''
+                    cd frontend
+                    npm run build
+                '''
+            }
+        }
+ 
+        stage('Deploy to DevTest') {
+            steps {
+                sh '''
+                    ssh $VM_USER@$VM_HOST << 'EOF'
+                        sudo mkdir -p $DEPLOY_DIR
+                        sudo rm -rf $DEPLOY_DIR/*
+                        sudo cp -r $APP_PATH/* $DEPLOY_DIR/
+                        sudo chown -R $USER:$USER $DEPLOY_DIR
+ 
+                        cd $DEPLOY_DIR
                         python3 -m venv venv
                         source venv/bin/activate
-                        pip install --upgrade pip
-                        pip install -r backend/requirements.txt
-
-                        # Kill old app and start new
-                        pkill -f backend/app.py || true
-                        nohup python3 backend/app.py > app.log 2>&1 &
-                    ENDSSH
-                """
+ 
+                        cd backend
+                        pip install -r requirements.txt
+                        pip install gunicorn
+ 
+                        export FLASK_APP=app.py
+                        flask db upgrade
+ 
+                        sudo tee /etc/systemd/system/$APP_NAME.service > /dev/null << SERVICE
+[Unit]
+Description=ITHC Software App
+After=network.target
+ 
+[Service]
+User=$USER
+WorkingDirectory=$DEPLOY_DIR/backend
+Environment="PATH=$DEPLOY_DIR/venv/bin"
+Environment="FLASK_ENV=production"
+ExecStart=$DEPLOY_DIR/venv/bin/gunicorn -w 4 -b 127.0.0.1:8000 app:app
+ 
+[Install]
+WantedBy=multi-user.target
+SERVICE
+ 
+                        sudo tee /etc/nginx/sites-available/$APP_NAME > /dev/null << NGINX
+server {
+    listen 80;
+    zeeshan 10.102.193.125;
+ 
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+    }
+ 
+    location /static/ {
+        alias $DEPLOY_DIR/frontend/static/;
+    }
+}
+NGINX
+ 
+                        sudo ln -sf /etc/nginx/sites-available/$APP_NAME /etc/nginx/sites-enabled/
+                        sudo nginx -t
+                        sudo systemctl daemon-reload
+                        sudo systemctl restart nginx
+                        sudo systemctl restart $APP_NAME
+                        sudo systemctl enable $APP_NAME
+                    EOF
+                '''
             }
         }
     }
-
+ 
     post {
         always {
             cleanWs()
         }
         success {
-            echo '✅ Deployment succeeded.'
+            echo 'Pipeline completed successfully!'
         }
         failure {
-            echo '❌ Build failed.'
+            echo 'Pipeline failed!'
         }
     }
-}
+}    

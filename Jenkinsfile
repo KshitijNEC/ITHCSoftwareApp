@@ -9,7 +9,7 @@ pipeline {
     stages {
 
         stage('Zip Project on Windows') {
-            agent { label 'windows' }  // Ensure you have a Windows node labeled 'windows'
+            agent any  // Will run on any available agent (Windows assumed here)
             steps {
                 bat '''
                 @echo off
@@ -38,7 +38,7 @@ pipeline {
         }
 
         stage('Checkout & Deploy on Linux') {
-            agent { label 'linux' }  // Make sure this runs on a Linux agent
+            agent { label 'linux' }  // Requires a Linux agent with 'linux' label
             stages {
 
                 stage('Checkout') {

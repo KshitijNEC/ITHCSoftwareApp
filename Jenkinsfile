@@ -15,15 +15,18 @@ pipeline {
             }
         }
 
-        stage('Setup Backend Dependencies') {
-            steps {
-                bat '''
-                cd backend
-                python3 -m venv venv
-                venv\\Scripts\\activate && pip3 install -r requirements.txt
-                '''
-            }
+      stage('Setup Backend Dependencies') {
+    steps {
+        dir('backend') {
+            bat '''
+                python -m venv venv
+                call venv\\Scripts\\activate
+                pip install -r requirements.txt
+            '''
         }
+    }
+}
+
 
         stage('Setup Frontend Dependencies') {
             steps {

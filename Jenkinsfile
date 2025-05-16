@@ -2,41 +2,35 @@ pipeline {
     agent any
 
     environment {
-        DEPLOY_DIR = "/home/kshitij-necsws/Desktop/test_deploy"
-        VENV_DIR = "${DEPLOY_DIR}/venv"
+        APP_NAME = 'ithcapp'
+        DEPLOY_DIR = '/application_deploy/deploy_folder'
+        VENV_PATH = "${DEPLOY_DIR}/venv"
+        VM_USER = 'kshitij-necsws'
+        VM_HOST = '10.102.192.172'
+        APP_PATH = '/home/kshitij-necsws/Desktop/deploy_folder'
     }
 
     stages {
-        stage('Checkout Code') {
+        stage('Checkout') {
             steps {
-                dir("${DEPLOY_DIR}") {
-                    checkout scm
-                }
+                git branch: 'main', url: 'https://github.com/KshitijNEC/ITHCSoftwareApp.git'
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Setup Environment') {
             steps {
-                dir("${DEPLOY_DIR}") {
-                    sh """
-                        python3 -m venv venv || true
-                        source venv/bin/activate
-                        pip install --upgrade pip
-                        pip install -r backend/requirements.txt
-                    """
-                }
-            }
-        }
+                bat '''
+                    python -m venv venv
+                    call venv\\Scripts\\activate
 
-        stage('Run Flask App') {
-            steps {
-                dir("${DEPLOY_DIR}") {
-                    sh """
-                        source venv/bin/activate
-                        nohup python3 backend/app.py > flask.log 2>&1 &
-                    """
-                }
+                    cd backend
+                    pip install -r requirements.txt
+                    pip install pytest-cov pytest-html
+
+                    cd ..\\frontend
+                    npm install
+                '''
             }
         }
-    }
-}
+    } // <-- this closes 'stages'
+} // <-- this closes 'pipeline'

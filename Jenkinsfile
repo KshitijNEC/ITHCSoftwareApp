@@ -9,39 +9,33 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                checkout scm
+                dir("${DEPLOY_DIR}") {
+                    checkout scm
+                }
             }
         }
 
-        stage('Clean Deployment Folder') {
+        stage('Install Dependencies') {
             steps {
-                sh "rm -rf ${DEPLOY_DIR}/*"
-            }
-        }
-
-        stage('Copy Project Files') {
-            steps {
-                sh "cp -r * ${DEPLOY_DIR}"
-            }
-        }
-
-        stage('Setup Python Environment') {
-            steps {
-                sh """
-                    python3 -m venv ${VENV_DIR}
-                    source ${VENV_DIR}/bin/activate
-                    pip install --upgrade pip
-                    pip install -r ${DEPLOY_DIR}/backend/requirements.txt
-                """
+                dir("${DEPLOY_DIR}") {
+                    sh """
+                        python3 -m venv venv || true
+                        source venv/bin/activate
+                        pip install --upgrade pip
+                        pip install -r backend/requirements.txt
+                    """
+                }
             }
         }
 
         stage('Run Flask App') {
             steps {
-                sh """
-                    source ${VENV_DIR}/bin/activate
-                    nohup python3 ${DEPLOY_DIR}/backend/app.py > ${DEPLOY_DIR}/flask.log 2>&1 &
-                """
+                dir("${DEPLOY_DIR}") {
+                    sh """
+                        source venv/bin/activate
+                        nohup python3 backend/app.py > flask.log 2>&1 &
+                    """
+                }
             }
         }
     }

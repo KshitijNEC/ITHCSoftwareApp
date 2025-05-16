@@ -24,7 +24,13 @@ pipeline {
                     call venv\\Scripts\\activate
 
                     cd backend
-                    pip install -r requirements.txt
+
+                    REM Install numpy first to help with pandas install
+                    pip install --prefer-binary numpy
+
+                    REM Install other dependencies with prefer-binary
+                    pip install --prefer-binary -r requirements.txt
+
                     pip install pytest-cov pytest-html
 
                     cd ..\\frontend
@@ -32,5 +38,5 @@ pipeline {
                 '''
             }
         }
-    } // <-- this closes 'stages'
-} // <-- this closes 'pipeline'
+    }
+}

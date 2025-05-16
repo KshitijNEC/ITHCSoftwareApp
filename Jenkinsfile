@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DEPLOY_DIR = 'C:\\Users\\kshitij-necsws\\Desktop\\test_deploy'  // Change this to your desired path
+        DEPLOY_DIR = '/home/kshitij-necsws/Desktop/test_deploy' // Change to your Linux path
         REPO_URL = 'https://github.com/KshitijNEC/ITHCSoftwareApp.git'
     }
 
@@ -15,18 +15,18 @@ pipeline {
 
         stage('Deploy Locally') {
             steps {
-                bat """
-                    if exist "${DEPLOY_DIR}" rmdir /s /q "${DEPLOY_DIR}"
-                    mkdir "${DEPLOY_DIR}"
-                    xcopy * "${DEPLOY_DIR}" /E /I /Y
+                sh """
+                    rm -rf "${DEPLOY_DIR}"
+                    mkdir -p "${DEPLOY_DIR}"
+                    cp -r * "${DEPLOY_DIR}"
 
-                    cd "${DEPLOY_DIR}\\backend"
-                    python -m venv venv
-                    call venv\\Scripts\\activate
+                    cd "${DEPLOY_DIR}/backend"
+                    python3 -m venv venv
+                    source venv/bin/activate
                     pip install --prefer-binary numpy
                     pip install --prefer-binary -r requirements.txt
 
-                    cd ..\\frontend
+                    cd "${DEPLOY_DIR}/frontend"
                     npm install
                 """
             }

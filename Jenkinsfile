@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DEPLOY_DIR = '/home/kshitij-necsws/Desktop/test_deploy'  // Your target local path
+        DEPLOY_DIR = '/home/kshitij-necsws/Desktop/test_deploy'
         REPO_URL = 'https://github.com/KshitijNEC/ITHCSoftwareApp.git'
     }
 
@@ -17,7 +17,7 @@ pipeline {
             steps {
                 sh """
                     mkdir -p "${DEPLOY_DIR}"
-                    rm -rf "${DEPLOY_DIR:?}/"*
+                    rm -rf "${DEPLOY_DIR}/"*
                     cp -r * "${DEPLOY_DIR}"
 
                     cd "${DEPLOY_DIR}/backend"

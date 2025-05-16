@@ -2,10 +2,10 @@ pipeline {
     agent any
 
     environment {
-        DEPLOY_DIR = 'C:\\Users\\kshitij-necsws\\Desktop\\test_deploy'
-        VENV_PATH = "${DEPLOY_DIR}\\venv"
-        BACKEND_DIR = "${DEPLOY_DIR}\\backend"
-        FRONTEND_DIR = "${DEPLOY_DIR}\\frontend"
+        DEPLOY_DIR = '/home/kshitij-necsws/Desktop/test_deploy'
+        VENV_PATH = "${DEPLOY_DIR}/venv"
+        BACKEND_DIR = "${DEPLOY_DIR}/backend"
+        FRONTEND_DIR = "${DEPLOY_DIR}/frontend"
     }
 
     stages {
@@ -15,56 +15,47 @@ pipeline {
             }
         }
 
-        stage('Deploy Locally to Desktop') {
+        stage('Deploy Locally (Linux)') {
             steps {
-                bat '''
-                    REM Create deploy folder if it doesn't exist
-                    if not exist "%DEPLOY_DIR%" mkdir "%DEPLOY_DIR%"
-
-                    REM Clean deploy folder
-                    del /q "%DEPLOY_DIR%\\*" 2>nul
-                    for /d %%i in ("%DEPLOY_DIR%\\*") do rmdir /s /q "%%i"
-
-                    REM Copy project files to deploy folder
-                    xcopy /E /I /Y * "%DEPLOY_DIR%\\"
-                '''
+                sh """
+                    mkdir -p "${DEPLOY_DIR}"
+                    rm -rf "${DEPLOY_DIR:?}/"*
+                    cp -r * "${DEPLOY_DIR}"
+                """
             }
         }
 
         stage('Setup Environment & Install Dependencies') {
             steps {
-                bat '''
-                    cd "%DEPLOY_DIR%"
-                    python -m venv venv
-                    call venv\\Scripts\\activate
-
-                    cd backend
+                sh """
+                    python3 -m venv "${VENV_PATH}"
+                    source "${VENV_PATH}/bin/activate"
+                    cd "${BACKEND_DIR}"
                     pip install -r requirements.txt
                     pip install pytest pytest-cov pytest-html
-
-                    cd ..\\frontend
+                    cd "${FRONTEND_DIR}"
                     npm install
-                '''
+                """
             }
         }
 
         stage('Run Backend Tests') {
             steps {
-                bat '''
-                    call "%VENV_PATH%\\Scripts\\activate"
-                    cd "%BACKEND_DIR%"
+                sh """
+                    source "${VENV_PATH}/bin/activate"
+                    cd "${BACKEND_DIR}"
                     pytest --maxfail=1 --disable-warnings --html=report.html
-                '''
+                """
             }
         }
 
         stage('Start Flask App') {
             steps {
-                bat '''
-                    call "%VENV_PATH%\\Scripts\\activate"
-                    cd "%BACKEND_DIR%"
-                    start /B python app.py
-                '''
+                sh """
+                    source "${VENV_PATH}/bin/activate"
+                    cd "${BACKEND_DIR}"
+                    nohup python3 app.py > flask.log 2>&1 &
+                """
             }
         }
     }

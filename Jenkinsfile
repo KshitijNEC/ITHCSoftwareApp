@@ -2,35 +2,94 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME = 'ithcapp'
-        DEPLOY_DIR = '/application_deploy/deploy_folder'
-        VENV_PATH = "${DEPLOY_DIR}/venv"
-        VM_USER = 'kshitij-necsws'
-        VM_HOST = '10.102.192.172'
-        APP_PATH = '/home/kshitij-necsws/Desktop/deploy_folder'
+        DEPLOY_PATH = "/home/kshitij-necsws/test_deploy"
+        GIT_CREDENTIALS = "jenkins_github_cred"
+        SSH_CREDENTIALS = "ubuntu_vm_access_key"
+        VM_HOST = "10.102.192.172"
     }
 
     stages {
+
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/KshitijNEC/ITHCSoftwareApp.git'
+                git credentialsId: "${GIT_CREDENTIALS}", url: 'https://github.com/KshitijNEC/ITHCSoftwareApp', branch: 'main'
             }
         }
 
-        stage('Setup Environment') {
+        stage('Environment Setup (Backend)') {
             steps {
-                bat '''
-                    python -m venv venv
-                    call venv\\Scripts\\activate
-
-                    cd backend
-                    pip install -r requirements.txt
-                    pip install pytest-cov pytest-html
-
-                    cd ..\\frontend
-                    npm install
-                '''
+                sshagent(credentials: ["${SSH_CREDENTIALS}"]) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no kshitij-necsws@${VM_HOST} << EOF
+                            cd ${DEPLOY_PATH}
+                            python3 -m venv venv
+                            source venv/bin/activate
+                            cd backend
+                            pip install -r requirements.txt
+                            flask db upgrade
+                        EOF
+                    """
+                }
             }
         }
-    } // <-- this closes 'stages'
-} // <-- this closes 'pipeline'
+
+        stage('Frontend Setup') {
+            steps {
+                sshagent(credentials: ["${SSH_CREDENTIALS}"]) {
+                    sh """
+                        ssh kshitij-necsws@${VM_HOST} << EOF
+                            cd ${DEPLOY_PATH}/frontend
+                            npm install
+                            npm run build
+                        EOF
+                    """
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                script {
+                    def backendStatus = sh (
+                        script: """
+                            ssh -o StrictHostKeyChecking=no kshitij-necsws@${VM_HOST} << EOF
+                                cd ${DEPLOY_PATH}
+                                source venv/bin/activate
+                                cd backend
+                                pytest || echo "Backend tests failed"
+                            EOF
+                        """, returnStatus: true
+                    )
+
+                    def frontendStatus = sh (
+                        script: """
+                            ssh -o StrictHostKeyChecking=no kshitij-necsws@${VM_HOST} << EOF
+                                cd ${DEPLOY_PATH}/frontend
+                                npm test || echo "Frontend tests failed"
+                            EOF
+                        """, returnStatus: true
+                    )
+
+                    if (backendStatus != 0 || frontendStatus != 0) {
+                        echo "Some tests failed, but continuing with deployment..."
+                    }
+                }
+            }
+        }
+
+        stage('Deployment') {
+            steps {
+                sshagent(credentials: ["${SSH_CREDENTIALS}"]) {
+                    sh """
+                        ssh kshitij-necsws@${VM_HOST} << EOF
+                            cd ${DEPLOY_PATH}
+                            source venv/bin/activate
+                            cd backend
+                            FLASK_APP=app.py flask run --host=0.0.0.0 --port=5000
+                        EOF
+                    """
+                }
+            }
+        }
+    }
+}

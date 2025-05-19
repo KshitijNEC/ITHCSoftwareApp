@@ -1,89 +1,360 @@
 pipeline {
+
     agent any
-
+ 
     environment {
-        DEPLOY_PATH = "/home/kshitij-necsws/test_deploy"
-        VM_HOST = "10.102.192.172"
-        VM_USER = "kshitij-necsws"
-    }
 
+        APP_NAME = 'ithcapp'
+
+        DEPLOY_DIR = '/application_deploy/deploy_folder'
+
+        VENV_PATH = "${DEPLOY_DIR}/venv"
+
+        VM_USER = 'kshitij-necsws'
+
+        VM_HOST = '10.102.192.172'
+
+        APP_PATH = '/home/kshitij-necsws/Desktop/deploy_folder'
+
+    }
+ 
     stages {
 
         stage('Checkout') {
+
             steps {
-                git credentialsId: "jenkins_github_cred", url: 'https://github.com/KshitijNEC/ITHCSoftwareApp', branch: 'main'
+
+                git branch: 'main', url: 'https://github.com/KshitijNEC/ITHCSoftwareApp.git'
+
             }
+
         }
+ 
+        stage('Check Python Version') {
 
-        stage('Environment Setup (Backend)') {
             steps {
-                sh """
-                    ssh -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} << EOF
-                        cd ${DEPLOY_PATH}
-                        python3 -m venv venv
-                        source venv/bin/activate
-                        pip install --upgrade pip
-                        cd backend
-                        pip install -r requirements.txt
-                        flask db upgrade
-                    EOF
-                """
-            }
-        }
 
-        stage('Frontend Setup') {
-            steps {
-                sh """
-                    ssh -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} << EOF
-                        cd ${DEPLOY_PATH}/frontend
-                        npm ci
-                        npm run build
-                    EOF
-                """
-            }
-        }
+                withEnv(['PATH=C:\\Program Files\\Python311;C:\\Program Files\\Python311\\Scripts;' + env.PATH]) {
 
-        stage('Run Tests') {
-            steps {
-                script {
-                    def backendStatus = sh (
-                        script: """
-                            ssh -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} << EOF
-                                cd ${DEPLOY_PATH}
-                                source venv/bin/activate
-                                cd backend
-                                pytest || echo "Backend tests failed"
-                            EOF
-                        """, returnStatus: true
-                    )
+                    bat 'python --version'
 
-                    def frontendStatus = sh (
-                        script: """
-                            ssh -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} << EOF
-                                cd ${DEPLOY_PATH}/frontend
-                                npm test || echo "Frontend tests failed"
-                            EOF
-                        """, returnStatus: true
-                    )
-
-                    if (backendStatus != 0 || frontendStatus != 0) {
-                        echo "Some tests failed, but continuing with deployment..."
-                    }
                 }
+
             }
+
+        }
+ 
+        stage('Setup Environment') {
+
+            steps {
+
+                withEnv(['PATH=C:\\Program Files\\Python311;C:\\Program Files\\Python311\\Scripts;' + env.PATH]) {
+
+                    bat '''
+
+                    python -m venv venv
+
+                    call venv\\Scripts\\activate
+ 
+                    cd backend
+
+                    pip install -r requirements.txt
+
+                    pip install pytest-cov pytest-html
+ 
+                    cd ..\\frontend
+
+                    npm install
+
+                    '''
+
+                }
+
+            }
+
         }
 
-        stage('Deployment') {
-            steps {
-                sh """
-                    ssh -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} << EOF
-                        cd ${DEPLOY_PATH}/backend
-                        source ../venv/bin/activate
-                        export FLASK_APP=app.py
-                        nohup flask run --host=0.0.0.0 --port=5000 > flask.log 2>&1 &
-                    EOF
-                """
+         stage('Run Tests') {
+
+            parallel {
+
+                stage('Backend Tests') {
+
+                    steps {
+
+                        withEnv(['PATH=C:\\Program Files\\Python311;C:\\Program Files\\Python311\\Scripts;' + env.PATH]) {
+
+                            sh '''
+
+                            . venv/bin/activate
+
+                            cd backend
+
+                            pytest
+
+                            pytest --cov=.
+
+                            pytest tests/test_software.py
+
+                            pytest --cov=. --cov-report=html:coverage-report --html=test-report.html || true
+
+                            '''
+
+                        }
+
+                    }
+
+                    post {
+
+                        always {
+
+                            publishHTML([
+
+                                allowMissing: true,
+
+                                alwaysLinkToLastBuild: true,
+
+                                keepAll: true,
+
+                                reportDir: 'backend',
+
+                                reportFiles: 'test-report.html,coverage-report/**',
+
+                                reportName: 'Backend Test Report',
+
+                                reportTitles: 'Test Report,Coverage Report'
+
+                            ])
+
+                        }
+
+                    }
+
+                }
+ 
+                stage('Frontend Tests') {
+
+                    steps {
+
+                        withEnv(['PATH=C:\\Program Files\\Python311;C:\\Program Files\\Python311\\Scripts;' + env.PATH]) {
+
+                            sh '''
+
+                            cd frontend
+
+                            npm test
+
+                            npm run test:watch || true
+
+                            npm run test:coverage || true
+
+                            '''
+
+                        }
+
+                    }
+
+                    post {
+
+                        always {
+
+                            script {
+
+                                 def reportExists = fileExists 'frontend/junit.xml'
+
+                                 if (reportExists) {
+
+                                     junit 'frontend/junit.xml'
+
+                                   } else {
+
+                                      echo 'JUnit report not found. Skipping junit archiving.'                                   
+
+                                 }
+
+                              }
+
+                            publishHTML([
+
+                                allowMissing: true,
+
+                                alwaysLinkToLastBuild: true,
+
+                                keepAll: true,
+
+                                reportDir: 'frontend/coverage',
+
+                                reportFiles: 'index.html',
+
+                                reportName: 'Frontend Coverage Report'
+
+                            ])
+
+                        }
+
+                    }
+
+                }
+
             }
+
         }
+ 
+        stage('Build Frontend') {
+
+            steps {
+
+                withEnv(['PATH=C:\\Program Files\\Python311;C:\\Program Files\\Python311\\Scripts;' + env.PATH]) {
+
+                    sh '''
+
+                    npm run build
+
+                    '''
+
+                }
+
+            }
+
+        }
+ 
+        stage('Deploy to DevTest') {
+
+            steps {
+
+                withEnv(['PATH=C:\\Program Files\\Python311;C:\\Program Files\\Python311\\Scripts;' + env.PATH]) {
+
+                    sh '''
+
+                    ssh $VM_USER@$VM_HOST << 'EOF'
+
+                        sudo mkdir -p $DEPLOY_DIR
+
+                        sudo rm -rf $DEPLOY_DIR/*
+
+                        sudo cp -r $APP_PATH/* $DEPLOY_DIR/
+
+                        sudo chown -R $USER:$USER $DEPLOY_DIR
+ 
+                        cd $DEPLOY_DIR
+
+                        python3 -m venv venv
+
+                        source venv/bin/activate
+ 
+                        cd backend
+
+                        pip install -r requirements.txt
+
+                        pip install gunicorn
+ 
+                        export FLASK_APP=app.py
+
+                        flask db upgrade
+ 
+                        sudo tee /etc/systemd/system/$APP_NAME.service > /dev/null << SERVICE
+
+[Unit]
+
+Description=ITHC Software App
+
+After=network.target
+ 
+[Service]
+
+User=$USER
+
+WorkingDirectory=$DEPLOY_DIR/backend
+
+Environment="PATH=$DEPLOY_DIR/venv/bin"
+
+Environment="FLASK_ENV=production"
+
+ExecStart=$DEPLOY_DIR/venv/bin/gunicorn -w 4 -b 127.0.0.1:8000 app:app
+ 
+[Install]
+
+WantedBy=multi-user.target
+
+SERVICE
+ 
+                        sudo tee /etc/nginx/sites-available/$APP_NAME > /dev/null << NGINX
+
+server {
+
+    listen 80;
+
+    server_name 10.102.193.125;
+ 
+    location / {
+
+        proxy_pass http://127.0.0.1:8000;
+
+        proxy_set_header Host \$host;
+
+        proxy_set_header X-Real-IP \$remote_addr;
+
     }
+ 
+    location /static/ {
+
+        alias $DEPLOY_DIR/frontend/static/;
+
+    }
+
 }
+
+NGINX
+ 
+                        sudo ln -sf /etc/nginx/sites-available/$APP_NAME /etc/nginx/sites-enabled/
+
+                        sudo nginx -t
+
+                        sudo systemctl daemon-reload
+
+                        sudo systemctl restart nginx
+
+                        sudo systemctl restart $APP_NAME
+
+                        sudo systemctl enable $APP_NAME
+
+                    EOF
+
+                    '''
+
+                }
+
+            }
+
+        }
+
+    }
+ 
+    post {
+
+        always {
+
+            cleanWs()
+
+        }
+
+        success {
+
+            echo 'Pipeline completed successfully!'
+
+        }
+
+        failure {
+
+            echo 'Pipeline failed!'
+
+        }
+
+    }
+
+}
+ 
+    
+ 
+       
+ 

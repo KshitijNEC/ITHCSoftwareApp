@@ -1,50 +1,44 @@
 pipeline {
     agent any
 
-
     environment {
         DEPLOY_PATH = "/home/kshitij-necsws/test_deploy"
-        GIT_CREDENTIALS = "jenkins_github_cred"
-        SSH_CREDENTIALS = "ubuntu_vm_access_key"
         VM_HOST = "10.102.192.172"
+        VM_USER = "kshitij-necsws"
     }
 
     stages {
 
         stage('Checkout') {
             steps {
-                git credentialsId: "${GIT_CREDENTIALS}", url: 'https://github.com/KshitijNEC/ITHCSoftwareApp', branch: 'main'
+                git credentialsId: "jenkins_github_cred", url: 'https://github.com/KshitijNEC/ITHCSoftwareApp', branch: 'main'
             }
         }
 
         stage('Environment Setup (Backend)') {
             steps {
-                sshagent(credentials: ["${SSH_CREDENTIALS}"]) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no kshitij-necsws@${VM_HOST} << EOF
-                            cd ${DEPLOY_PATH}
-                            python3 -m venv venv
-                            source venv/bin/activate
-                            cd backend
-                            pip install -r requirements.txt
-                            flask db upgrade
-                        EOF
-                    """
-                }
+                sh """
+                    ssh -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} << EOF
+                        cd ${DEPLOY_PATH}
+                        python3 -m venv venv
+                        source venv/bin/activate
+                        cd backend
+                        pip install -r requirements.txt
+                        flask db upgrade
+                    EOF
+                """
             }
         }
 
         stage('Frontend Setup') {
             steps {
-                sshagent(credentials: ["${SSH_CREDENTIALS}"]) {
-                    sh """
-                        ssh kshitij-necsws@${VM_HOST} << EOF
-                            cd ${DEPLOY_PATH}/frontend
-                            npm install
-                            npm run build
-                        EOF
-                    """
-                }
+                sh """
+                    ssh ${VM_USER}@${VM_HOST} << EOF
+                        cd ${DEPLOY_PATH}/frontend
+                        npm install
+                        npm run build
+                    EOF
+                """
             }
         }
 
@@ -53,7 +47,7 @@ pipeline {
                 script {
                     def backendStatus = sh (
                         script: """
-                            ssh -o StrictHostKeyChecking=no kshitij-necsws@${VM_HOST} << EOF
+                            ssh -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} << EOF
                                 cd ${DEPLOY_PATH}
                                 source venv/bin/activate
                                 cd backend
@@ -64,7 +58,7 @@ pipeline {
 
                     def frontendStatus = sh (
                         script: """
-                            ssh -o StrictHostKeyChecking=no kshitij-necsws@${VM_HOST} << EOF
+                            ssh -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} << EOF
                                 cd ${DEPLOY_PATH}/frontend
                                 npm test || echo "Frontend tests failed"
                             EOF
@@ -80,16 +74,14 @@ pipeline {
 
         stage('Deployment') {
             steps {
-                sshagent(credentials: ["${SSH_CREDENTIALS}"]) {
-                    sh """
-                        ssh kshitij-necsws@${VM_HOST} << EOF
-                            cd ${DEPLOY_PATH}
-                            source venv/bin/activate
-                            cd backend
-                            FLASK_APP=app.py flask run --host=0.0.0.0 --port=5000
-                        EOF
-                    """
-                }
+                sh """
+                    ssh ${VM_USER}@${VM_HOST} << EOF
+                        cd ${DEPLOY_PATH}
+                        source venv/bin/activate
+                        cd backend
+                        FLASK_APP=app.py flask run --host=0.0.0.0 --port=5000
+                    EOF
+                """
             }
         }
     }

@@ -22,6 +22,7 @@ pipeline {
                         cd ${DEPLOY_PATH}
                         python3 -m venv venv
                         source venv/bin/activate
+                        pip install --upgrade pip
                         cd backend
                         pip install -r requirements.txt
                         flask db upgrade
@@ -33,9 +34,9 @@ pipeline {
         stage('Frontend Setup') {
             steps {
                 sh """
-                    ssh ${VM_USER}@${VM_HOST} << EOF
+                    ssh -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} << EOF
                         cd ${DEPLOY_PATH}/frontend
-                        npm install
+                        npm ci
                         npm run build
                     EOF
                 """
@@ -75,11 +76,11 @@ pipeline {
         stage('Deployment') {
             steps {
                 sh """
-                    ssh ${VM_USER}@${VM_HOST} << EOF
-                        cd ${DEPLOY_PATH}
-                        source venv/bin/activate
-                        cd backend
-                        FLASK_APP=app.py flask run --host=0.0.0.0 --port=5000
+                    ssh -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} << EOF
+                        cd ${DEPLOY_PATH}/backend
+                        source ../venv/bin/activate
+                        export FLASK_APP=app.py
+                        nohup flask run --host=0.0.0.0 --port=5000 > flask.log 2>&1 &
                     EOF
                 """
             }

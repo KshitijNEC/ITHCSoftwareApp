@@ -1,6 +1,7 @@
 pipeline {
     agent any
 
+
     environment {
         DEPLOY_PATH = "/home/kshitij-necsws/test_deploy"
         GIT_CREDENTIALS = "jenkins_github_cred"

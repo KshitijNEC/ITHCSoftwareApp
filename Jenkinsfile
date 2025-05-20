@@ -25,16 +25,26 @@ pipeline {
             }
         }
 
-        stage('Zip Project') {
-            steps {
-                powershell '''
-                    if (Test-Path app_package.zip) {
-                        Remove-Item app_package.zip
-                    }
-                    Compress-Archive -Path backend, frontend -DestinationPath app_package.zip
-                '''
+        stage('Pre-Zip Cleanup') {
+    steps {
+        powershell '''
+            if (Test-Path backend/uploads) {
+                Remove-Item -Path backend/uploads/* -Force -Recurse -ErrorAction SilentlyContinue
             }
-        }
+        '''
+    }
+}
+
+stage('Zip Project') {
+    steps {
+        powershell '''
+            if (Test-Path app_package.zip) {
+                Remove-Item app_package.zip
+            }
+            Compress-Archive -Path backend, frontend -DestinationPath app_package.zip
+        '''
+    }
+}
 
         stage('Transfer to VM') {
             steps {

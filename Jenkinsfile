@@ -73,7 +73,7 @@ pipeline {
         stage('Transfer to VM') {
             steps {
                 
-                    pscp -q -C C:\ProgramData\Jenkins\.jenkins\workspace\deployment\app_package.zip %VM_USER%@%VM_HOST%:/tmp/app_package.zip
+                    pscp -q -C C:\ProgramData\Jenkins\.jenkins\workspace\deployment\app_package.zip kshitij-necsws@10.102.192.172:/tmp/app_package.zip
                 
             }
         }

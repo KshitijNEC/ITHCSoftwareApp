@@ -21,7 +21,6 @@ pipeline {
                 bat '''
                     cd frontend
                     call npm install
-                    rem call npm run build  :: Uncomment if needed later
                 '''
             }
         }

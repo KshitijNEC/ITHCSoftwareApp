@@ -3,10 +3,10 @@ pipeline {
 
     environment {
         APP_NAME = 'ithcapp'
-        DEPLOY_DIR = '/home/kshitij-necsws/deploy_folder'
+        DEPLOY_DIR = '/home/kshitij-necsws/Desktop/deploy_folder'
         VM_USER = 'kshitij-necsws'
         VM_HOST = '10.102.192.172'
-        ZIP_FILE = 'app_package.zip'
+        ZIP_FILE = 'ITHCSoftwareApp.zip'
     }
 
     stages {

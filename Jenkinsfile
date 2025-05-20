@@ -57,7 +57,8 @@ pipeline {
         stage('Transfer to VM') {
             steps {
                 bat """
-                    pscp app_package.zip %VM_USER%@%VM_HOST%:/tmp/%ZIP_FILE%
+                    scp app_package.zip kshitij-necsws@10.102.192.172:/tmp/app_package.zip
+
                 """
             }
         }

@@ -6,7 +6,7 @@ pipeline {
         DEPLOY_DIR = '/home/kshitij-necsws/Desktop/deploy_folder'
         VM_USER = 'kshitij-necsws'
         VM_HOST = '10.102.192.172'
-        ZIP_FILE = 'ITHCSoftwareApp.zip'
+        ZIP_FILE = 'app_package.zip'
     }
 
     stages {

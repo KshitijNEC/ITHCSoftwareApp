@@ -22,7 +22,7 @@ pipeline {
                     cd frontend
                     call npm install
                 '''
-                sleep(time: 5, unit: 'SECONDS') // short delay to release file locks
+                sleep(time: 5, unit: 'SECONDS')
             }
         }
 
@@ -37,33 +37,31 @@ pipeline {
         }
 
         stage('Zip Project') {
-    steps {
-        powershell '''
-            if (Test-Path "app_package.zip") {
-                Remove-Item "app_package.zip"
+            steps {
+                powershell '''
+                    if (Test-Path "app_package.zip") {
+                        Remove-Item "app_package.zip"
+                    }
+
+                    $backendFiles = Get-ChildItem -Path "backend" -Recurse -File | Select-Object -ExpandProperty FullName
+                    $frontendFiles = Get-ChildItem -Path "frontend" -Recurse -File | Where-Object { $_.FullName -notmatch "node_modules" } | Select-Object -ExpandProperty FullName
+
+                    $allFiles = $backendFiles + $frontendFiles
+
+                    Compress-Archive -Path $allFiles -DestinationPath "app_package.zip"
+                '''
             }
+        }
 
-            $backendFiles = Get-ChildItem -Path "backend" -Recurse -File | Select-Object -ExpandProperty FullName
-            $frontendFiles = Get-ChildItem -Path "frontend" -Recurse -File | Where-Object { $_.FullName -notmatch "node_modules" } | Select-Object -ExpandProperty FullName
-
-            $allFiles = $backendFiles + $frontendFiles
-
-            Compress-Archive -Path $allFiles -DestinationPath "app_package.zip"
-        '''
-    }
-}
-
-
-        stage('Transfer to VM') {
+        stage('Transfer to VM (pscp)') {
             steps {
                 bat """
-                    scp app_package.zip kshitij-necsws@10.102.192.172:/tmp/app_package.zip
-
+                    pscp -batch -q -C app_package.zip %VM_USER%@%VM_HOST%:/tmp/%ZIP_FILE%
                 """
             }
         }
 
-        stage('Setup and Run Flask on VM') {
+        stage('Setup and Run Flask on VM (plink)') {
             steps {
                 bat """
                     plink -batch %VM_USER%@%VM_HOST% ^

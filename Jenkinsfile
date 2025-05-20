@@ -37,19 +37,22 @@ pipeline {
         }
 
         stage('Zip Project') {
-            steps {
-                powershell '''
-                    if (Test-Path "app_package.zip") {
-                        Remove-Item "app_package.zip"
-                    }
-
-                    $backendFiles = Get-ChildItem -Path "backend" -Recurse
-                    $frontendFiles = Get-ChildItem -Path "frontend" -Recurse | Where-Object { $_.FullName -notmatch "node_modules" }
-
-                    Compress-Archive -Path $backendFiles.FullName + $frontendFiles.FullName -DestinationPath "app_package.zip"
-                '''
+    steps {
+        powershell '''
+            if (Test-Path "app_package.zip") {
+                Remove-Item "app_package.zip"
             }
-        }
+
+            $backendFiles = Get-ChildItem -Path "backend" -Recurse -File | Select-Object -ExpandProperty FullName
+            $frontendFiles = Get-ChildItem -Path "frontend" -Recurse -File | Where-Object { $_.FullName -notmatch "node_modules" } | Select-Object -ExpandProperty FullName
+
+            $allFiles = $backendFiles + $frontendFiles
+
+            Compress-Archive -Path $allFiles -DestinationPath "app_package.zip"
+        '''
+    }
+}
+
 
         stage('Transfer to VM') {
             steps {

@@ -18,59 +18,43 @@ pipeline {
 
         stage('Build Frontend') {
             steps {
-                sh '''
+                bat '''
                     cd frontend
-                    npm install
-                    npm run build
+                    call npm install
+                    call npm run build
                 '''
             }
         }
 
         stage('Prepare Archive for Deployment') {
             steps {
-                sh '''
-                    mkdir -p build_artifacts
-                    cp -r backend frontend build_artifacts/
+                powershell '''
+                    if (!(Test-Path build_artifacts)) {
+                        New-Item -ItemType Directory -Path build_artifacts
+                    }
+                    Copy-Item -Recurse -Force backend build_artifacts/
+                    Copy-Item -Recurse -Force frontend build_artifacts/
                 '''
             }
         }
 
         stage('Deploy to VM') {
             steps {
-                sh '''
-                    # Copy files to remote VM
-                    scp -r build_artifacts/* $VM_USER@$VM_HOST:/tmp/$APP_NAME
-                '''
+                bat """
+                    pscp -r build_artifacts\\* %VM_USER%@%VM_HOST%:/tmp/%APP_NAME%
+                """
             }
         }
 
         stage('Setup on VM') {
             steps {
-                sh '''
-                    ssh $VM_USER@$VM_HOST << 'EOF'
-                        # Move deployment to proper directory
-                        rm -rf $DEPLOY_DIR
-                        mkdir -p $DEPLOY_DIR
-                        cp -r /tmp/$APP_NAME/* $DEPLOY_DIR
-                        rm -rf /tmp/$APP_NAME
-
-                        # Setup Python environment
-                        cd $DEPLOY_DIR
-                        python3 -m venv venv
-                        source venv/bin/activate
-
-                        cd backend
-                        pip install --upgrade pip
-                        pip install -r requirements.txt
-
-                        # Run DB migrations
-                        export FLASK_APP=app.py
-                        flask db upgrade
-
-                        # Start app (development server, for now)
-                        nohup flask run --host=0.0.0.0 --port=8000 &
-                    EOF
-                '''
+                bat """
+                    plink %VM_USER%@%VM_HOST% ^
+                    "rm -rf $DEPLOY_DIR && mkdir -p $DEPLOY_DIR && cp -r /tmp/$APP_NAME/* $DEPLOY_DIR && rm -rf /tmp/$APP_NAME && ^
+                    cd $DEPLOY_DIR && python3 -m venv venv && source venv/bin/activate && ^
+                    cd backend && pip install --upgrade pip && pip install -r requirements.txt && ^
+                    export FLASK_APP=app.py && flask db upgrade && nohup flask run --host=0.0.0.0 --port=8000 &"
+                """
             }
         }
     }

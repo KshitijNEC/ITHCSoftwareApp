@@ -22,7 +22,7 @@ pipeline {
                     cd frontend
                     call npm install
                 '''
-                sleep(time: 5, unit: 'SECONDS')
+                sleep(time: 10, unit: 'SECONDS')
             }
         }
 
@@ -39,25 +39,42 @@ pipeline {
         stage('Zip Project') {
             steps {
                 powershell '''
-                    if (Test-Path "app_package.zip") {
-                        Remove-Item "app_package.zip"
+                    $zipSuccess = $false
+                    $attempts = 0
+
+                    while (-not $zipSuccess -and $attempts -lt 3) {
+                        try {
+                            if (Test-Path "app_package.zip") {
+                                Remove-Item "app_package.zip"
+                            }
+
+                            $backendFiles = Get-ChildItem -Path "backend" -Recurse -File | Select-Object -ExpandProperty FullName
+                            $frontendFiles = Get-ChildItem -Path "frontend" -Recurse -File | Where-Object { $_.FullName -notmatch "node_modules" } | Select-Object -ExpandProperty FullName
+
+                            $allFiles = $backendFiles + $frontendFiles
+
+                            Compress-Archive -Path $allFiles -DestinationPath "app_package.zip"
+
+                            $zipSuccess = $true
+                        } catch {
+                            Write-Host "Compress-Archive failed, retrying in 5 seconds..."
+                            Start-Sleep -Seconds 5
+                            $attempts++
+                        }
                     }
 
-                    $backendFiles = Get-ChildItem -Path "backend" -Recurse -File | Select-Object -ExpandProperty FullName
-                    $frontendFiles = Get-ChildItem -Path "frontend" -Recurse -File | Where-Object { $_.FullName -notmatch "node_modules" } | Select-Object -ExpandProperty FullName
-
-                    $allFiles = $backendFiles + $frontendFiles
-
-                    Compress-Archive -Path $allFiles -DestinationPath "app_package.zip"
+                    if (-not $zipSuccess) {
+                        throw "Compress-Archive failed after multiple attempts."
+                    }
                 '''
             }
         }
 
-        stage('Transfer to VM (pscp)') {
+        stage('Transfer to VM') {
             steps {
-                bat """
-                    pscp -batch -q -C app_package.zip %VM_USER%@%VM_HOST%:/tmp/%ZIP_FILE%
-                """
+                bat '''
+                    pscp -batch -q -C app_package.zip %VM_USER%@%VM_HOST%:/tmp/app_package.zip
+                '''
             }
         }
 

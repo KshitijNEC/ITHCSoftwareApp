@@ -22,29 +22,34 @@ pipeline {
                     cd frontend
                     call npm install
                 '''
+                sleep(time: 5, unit: 'SECONDS') // short delay to release file locks
             }
         }
 
         stage('Pre-Zip Cleanup') {
-    steps {
-        powershell '''
-            if (Test-Path backend/uploads) {
-                Remove-Item -Path backend/uploads/* -Force -Recurse -ErrorAction SilentlyContinue
+            steps {
+                powershell '''
+                    if (Test-Path "backend/uploads") {
+                        Remove-Item -Path "backend/uploads/*" -Force -Recurse -ErrorAction SilentlyContinue
+                    }
+                '''
             }
-        '''
-    }
-}
+        }
 
-stage('Zip Project') {
-    steps {
-        powershell '''
-            if (Test-Path app_package.zip) {
-                Remove-Item app_package.zip
+        stage('Zip Project') {
+            steps {
+                powershell '''
+                    if (Test-Path "app_package.zip") {
+                        Remove-Item "app_package.zip"
+                    }
+
+                    $backendFiles = Get-ChildItem -Path "backend" -Recurse
+                    $frontendFiles = Get-ChildItem -Path "frontend" -Recurse | Where-Object { $_.FullName -notmatch "node_modules" }
+
+                    Compress-Archive -Path $backendFiles.FullName + $frontendFiles.FullName -DestinationPath "app_package.zip"
+                '''
             }
-            Compress-Archive -Path backend, frontend -DestinationPath app_package.zip
-        '''
-    }
-}
+        }
 
         stage('Transfer to VM') {
             steps {

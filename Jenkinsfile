@@ -21,19 +21,7 @@ pipeline {
                 bat '''
                     cd frontend
                     call npm install
-                    
-                '''
-            }
-        }
-
-        stage('Prepare Archive for Deployment') {
-            steps {
-                powershell '''
-                    if (!(Test-Path build_artifacts)) {
-                        New-Item -ItemType Directory -Path build_artifacts
-                    }
-                    Copy-Item -Recurse -Force backend build_artifacts/
-                    Copy-Item -Recurse -Force frontend build_artifacts/
+                    rem Optional: call npm run build if your app needs it
                 '''
             }
         }
@@ -41,7 +29,8 @@ pipeline {
         stage('Deploy to VM') {
             steps {
                 bat """
-                    pscp -r build_artifacts\\* %VM_USER%@%VM_HOST%:/tmp/%APP_NAME%
+                    pscp -r backend %VM_USER%@%VM_HOST%:/tmp/%APP_NAME%
+                    pscp -r frontend %VM_USER%@%VM_HOST%:/tmp/%APP_NAME%
                 """
             }
         }

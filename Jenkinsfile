@@ -6,6 +6,7 @@ pipeline {
         DEPLOY_DIR = '/home/kshitij-necsws/deploy_folder'
         VM_USER = 'kshitij-necsws'
         VM_HOST = '10.102.192.172'
+        ZIP_FILE = 'app_package.zip'
     }
 
     stages {
@@ -25,11 +26,21 @@ pipeline {
             }
         }
 
-        stage('Deploy to VM') {
+        stage('Zip Project') {
+            steps {
+                powershell '''
+                    if (Test-Path app_package.zip) {
+                        Remove-Item app_package.zip
+                    }
+                    Compress-Archive -Path backend, frontend -DestinationPath app_package.zip
+                '''
+            }
+        }
+
+        stage('Transfer to VM') {
             steps {
                 bat """
-                    pscp -r backend %VM_USER%@%VM_HOST%:/tmp/%APP_NAME%
-                    pscp -r frontend %VM_USER%@%VM_HOST%:/tmp/%APP_NAME%
+                    pscp app_package.zip %VM_USER%@%VM_HOST%:/tmp/%ZIP_FILE%
                 """
             }
         }
@@ -37,11 +48,13 @@ pipeline {
         stage('Setup and Run Flask on VM') {
             steps {
                 bat """
-                    plink %VM_USER%@%VM_HOST% ^
-                    "rm -rf ${DEPLOY_DIR} && mkdir -p ${DEPLOY_DIR} && cp -r /tmp/${APP_NAME}/* ${DEPLOY_DIR} && rm -rf /tmp/${APP_NAME} && ^
-                    cd ${DEPLOY_DIR} && python3 -m venv venv && source venv/bin/activate && ^
-                    cd backend && pip install --upgrade pip && pip install -r requirements.txt && ^
-                    export FLASK_APP=app.py && flask db upgrade && nohup flask run --host=0.0.0.0 --port=8000 &"
+                    plink -batch %VM_USER%@%VM_HOST% ^
+                    "rm -rf ${DEPLOY_DIR} && mkdir -p ${DEPLOY_DIR} && ^
+                     unzip /tmp/${ZIP_FILE} -d ${DEPLOY_DIR} && rm /tmp/${ZIP_FILE} && ^
+                     python3 -m venv ${DEPLOY_DIR}/venv && source ${DEPLOY_DIR}/venv/bin/activate && ^
+                     cd ${DEPLOY_DIR}/backend && pip install --upgrade pip && pip install -r requirements.txt && ^
+                     export FLASK_APP=app.py && flask db upgrade && ^
+                     nohup flask run --host=0.0.0.0 --port=8000 &"
                 """
             }
         }

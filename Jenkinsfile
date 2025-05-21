@@ -50,7 +50,8 @@ pipeline {
                                 Remove-Item "app_package.zip"
                             }
 
-                            $backendFiles = Get-ChildItem -Path "backend" -Recurse -File | Select-Object -ExpandProperty FullName
+                            # Exclude backend/migrations/README to prevent lock issue
+                            $backendFiles = Get-ChildItem -Path "backend" -Recurse -File | Where-Object { $_.FullName -notmatch "backend\\\\migrations\\\\README" } | Select-Object -ExpandProperty FullName
                             $frontendFiles = Get-ChildItem -Path "frontend" -Recurse -File | Where-Object { $_.FullName -notmatch "node_modules" } | Select-Object -ExpandProperty FullName
 
                             $allFiles = $backendFiles + $frontendFiles

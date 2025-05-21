@@ -73,13 +73,17 @@ pipeline {
 
     stage('Transfer to VM') {
     steps {
-        powershell """
+        powershell '''
             Write-Host "Starting SCP transfer..."
-            scp -o StrictHostKeyChecking=no -P 22 \\"$env:WORKSPACE\\\\$env:ZIP_FILE\\" $env:VM_USER@$env:VM_HOST:$env:REMOTE_ZIP_PATH
+            $scpPath = "C:\\Program Files\\Git\\usr\\bin\\scp.exe"  # Update if needed
+            & $scpPath -P 22 -o StrictHostKeyChecking=no `
+                "$env:WORKSPACE\\$env:ZIP_FILE" `
+                "$env:VM_USER@$env:VM_HOST:$env:REMOTE_ZIP_PATH"
             Write-Host "SCP transfer completed."
-        """
+        '''
     }
 }
+
         stage('Setup and Run Flask on VM') {
             steps {
                 bat """

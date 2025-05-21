@@ -7,6 +7,8 @@ pipeline {
         VM_USER = 'kshitij-necsws'
         VM_HOST = '10.102.192.172'
         ZIP_FILE = 'app_package.zip'
+        SSH_KEY = 'C:\\Users\\kshitij.waikar\\.ssh\\id_rsa.ppk'
+        ZIP_REMOTE_PATH = '/home/kshitij-necsws/Desktop/test_deploy/app_package.zip'
     }
 
     stages {
@@ -72,19 +74,18 @@ pipeline {
 
         stage('Transfer to VM') {
             steps {
-                bat '''
-                    pscp -P 22 -C "C:\ProgramData\Jenkins\.jenkins\workspace\deployment\app_package.zip" kshitij-necsws@10.102.192.172:/home/kshitij-necsws/Desktop/test_deploy/app_package.zip
-
-                '''
+                bat """
+                    pscp -i "%SSH_KEY%" -q -C "C:\\ProgramData\\Jenkins\\.jenkins\\workspace\\deployment\\app_package.zip" %VM_USER%@%VM_HOST%:%ZIP_REMOTE_PATH%
+                """
             }
         }
 
         stage('Setup and Run Flask on VM (plink)') {
             steps {
                 bat """
-                    plink -batch %VM_USER%@%VM_HOST% ^
+                    plink -batch -i "%SSH_KEY%" %VM_USER%@%VM_HOST% ^
                     "rm -rf ${DEPLOY_DIR} && mkdir -p ${DEPLOY_DIR} && ^
-                     unzip /tmp/${ZIP_FILE} -d ${DEPLOY_DIR} && rm /tmp/${ZIP_FILE} && ^
+                     unzip ${ZIP_REMOTE_PATH} -d ${DEPLOY_DIR} && rm ${ZIP_REMOTE_PATH} && ^
                      python3 -m venv ${DEPLOY_DIR}/venv && source ${DEPLOY_DIR}/venv/bin/activate && ^
                      cd ${DEPLOY_DIR}/backend && pip install --upgrade pip && pip install -r requirements.txt && ^
                      export FLASK_APP=app.py && flask db upgrade && ^
@@ -95,9 +96,6 @@ pipeline {
     }
 
     post {
-        // always {
-        //     cleanWs()
-        // }
         success {
             echo '✅ Deployment succeeded!'
         }

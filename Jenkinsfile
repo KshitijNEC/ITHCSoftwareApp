@@ -75,7 +75,9 @@ pipeline {
         stage('Transfer to VM') {
             steps {
                 bat """
-                    scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no "%WORKSPACE%\\%ZIP_FILE%" %VM_USER%@%VM_HOST%:%REMOTE_ZIP_PATH%
+                    scp -P 22 -o StrictHostKeyChecking=no ^
+                    "%WORKSPACE%\\%ZIP_FILE%" ^
+                    %VM_USER%@%VM_HOST%:%REMOTE_ZIP_PATH%
                 """
             }
         }
@@ -83,11 +85,11 @@ pipeline {
         stage('Setup and Run Flask on VM') {
             steps {
                 bat """
-                    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %VM_USER%@%VM_HOST% ^
-                    "rm -rf ${DEPLOY_DIR} && mkdir -p ${DEPLOY_DIR} && ^
-                     unzip ${REMOTE_ZIP_PATH} -d ${DEPLOY_DIR} && rm ${REMOTE_ZIP_PATH} && ^
-                     python3 -m venv ${DEPLOY_DIR}/venv && source ${DEPLOY_DIR}/venv/bin/activate && ^
-                     cd ${DEPLOY_DIR}/backend && pip install --upgrade pip && pip install -r requirements.txt && ^
+                    ssh -o StrictHostKeyChecking=no %VM_USER%@%VM_HOST% ^
+                    "rm -rf %DEPLOY_DIR% && mkdir -p %DEPLOY_DIR% && ^
+                     unzip %REMOTE_ZIP_PATH% -d %DEPLOY_DIR% && rm %REMOTE_ZIP_PATH% && ^
+                     python3 -m venv %DEPLOY_DIR%/venv && source %DEPLOY_DIR%/venv/bin/activate && ^
+                     cd %DEPLOY_DIR%/backend && pip install --upgrade pip && pip install -r requirements.txt && ^
                      export FLASK_APP=app.py && flask db upgrade && ^
                      nohup flask run --host=0.0.0.0 --port=8000 &"
                 """

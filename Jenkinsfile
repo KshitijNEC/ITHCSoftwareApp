@@ -71,15 +71,14 @@ pipeline {
             }
         }
 
-    stage('Transfer to VM') {
+  stage('Transfer to VM') {
     steps {
-        powershell '''
-            Write-Host "Starting SCP transfer..."
-            $scpPath = "C:\\Program Files\\Git\\usr\\bin\\scp.exe"  # Update if needed
-            & $scpPath -P 22 -o StrictHostKeyChecking=no `
-                "$env:WORKSPACE\\$env:ZIP_FILE" `
-                "$env:VM_USER@$env:VM_HOST:$env:REMOTE_ZIP_PATH"
-            Write-Host "SCP transfer completed."
+        bat '''
+            echo Starting SCP transfer...
+            scp -P 22 -o StrictHostKeyChecking=no ^
+                "%WORKSPACE%\\%ZIP_FILE%" ^
+                %VM_USER%@%VM_HOST%:%REMOTE_ZIP_PATH%
+            echo SCP transfer completed.
         '''
     }
 }

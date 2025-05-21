@@ -84,14 +84,11 @@ pipeline {
         stage('Setup and Run Flask on VM (plink)') {
             steps {
                 bat """
-                    plink -batch -i "%SSH_KEY%" %VM_USER%@%VM_HOST% ^
-                    "rm -rf ${DEPLOY_DIR} && mkdir -p ${DEPLOY_DIR} && ^
-                     unzip ${ZIP_REMOTE_PATH} -d ${DEPLOY_DIR} && rm ${ZIP_REMOTE_PATH} && ^
-                     python3 -m venv ${DEPLOY_DIR}/venv && source ${DEPLOY_DIR}/venv/bin/activate && ^
-                     cd ${DEPLOY_DIR}/backend && pip install --upgrade pip && pip install -r requirements.txt && ^
-                     export FLASK_APP=app.py && flask db upgrade && ^
-                     nohup flask run --host=0.0.0.0 --port=8000 &"
-                """
+    pscp -v -i "C:\\Users\\kshitij.waikar\\.ssh\\id_rsa.ppk" -C -q ^
+    "C:\\ProgramData\\Jenkins\\.jenkins\\workspace\\deployment\\app_package.zip" ^
+    kshitij-necsws@10.102.192.172:/home/kshitij-necsws/Desktop/test_deploy/app_package.zip
+"""
+
             }
         }
     }

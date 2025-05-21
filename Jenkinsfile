@@ -75,12 +75,11 @@ pipeline {
     steps {
         powershell """
             Write-Host "Starting SCP transfer..."
-            scp -P 22 "C:\ProgramData\Jenkins\.jenkins\workspace\deployment\app_package.zip" kshitij-necsws@10.102.192.172:/home/kshitij-necsws/Desktop/test_deploy/app_package.zip
+            scp -o StrictHostKeyChecking=no -P 22 \\"$env:WORKSPACE\\\\$env:ZIP_FILE\\" $env:VM_USER@$env:VM_HOST:$env:REMOTE_ZIP_PATH
             Write-Host "SCP transfer completed."
         """
     }
 }
-
         stage('Setup and Run Flask on VM') {
             steps {
                 bat """
@@ -97,8 +96,8 @@ pipeline {
     }
 
     post {
-        always {
-            cleanWs()
+        // always {
+        //     cleanWs()
         }
         success {
             echo '✅ Deployment succeeded!'

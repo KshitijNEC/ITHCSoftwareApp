@@ -71,13 +71,15 @@ pipeline {
             }
         }
 
-        stage('Transfer to VM') {
-            steps {
-                bat """
-                    scp -P 22 "%WORKSPACE%\\%ZIP_FILE%" %VM_USER%@%VM_HOST%:%REMOTE_ZIP_PATH%
-                """
-            }
-        }
+    stage('Transfer to VM') {
+    steps {
+        powershell """
+            Write-Host "Starting SCP transfer..."
+            scp -o StrictHostKeyChecking=no -P 22 \\"$env:WORKSPACE\\\\$env:ZIP_FILE\\" $env:VM_USER@$env:VM_HOST:$env:REMOTE_ZIP_PATH
+            Write-Host "SCP transfer completed."
+        """
+    }
+}
 
         stage('Setup and Run Flask on VM') {
             steps {

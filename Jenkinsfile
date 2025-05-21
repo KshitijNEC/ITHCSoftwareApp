@@ -73,8 +73,8 @@ pipeline {
         stage('Transfer to VM') {
             steps {
                 bat '''
-                    pscp -q -C C:/ProgramData/Jenkins/.jenkins/workspace/deployment/app_package.zip kshitij-necsws@10.102.192.172:/home/kshitij-necsws/Desktop/test_deploy
-/app_package.zip
+                    pscp -P 22 -C "C:\ProgramData\Jenkins\.jenkins\workspace\deployment\app_package.zip" kshitij-necsws@10.102.192.172:/home/kshitij-necsws/Desktop/test_deploy/app_package.zip
+
                 '''
             }
         }

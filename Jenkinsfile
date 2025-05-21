@@ -7,7 +7,6 @@ pipeline {
         VM_USER = 'kshitij-necsws'
         VM_HOST = '10.102.192.172'
         ZIP_FILE = 'app_package.zip'
-        SSH_KEY = 'C:\\Users\\kshitij.waikar\\.ssh\\id_rsa'
         REMOTE_ZIP_PATH = '/home/kshitij-necsws/Desktop/test_deploy/app_package.zip'
     }
 
@@ -50,8 +49,7 @@ pipeline {
                                 Remove-Item "app_package.zip"
                             }
 
-                            # Exclude backend/migrations/README to prevent lock issue
-                            $backendFiles = Get-ChildItem -Path "backend" -Recurse -File | Where-Object { $_.FullName -notmatch "backend\\\\migrations\\\\README" } | Select-Object -ExpandProperty FullName
+                            $backendFiles = Get-ChildItem -Path "backend" -Recurse -File | Select-Object -ExpandProperty FullName
                             $frontendFiles = Get-ChildItem -Path "frontend" -Recurse -File | Where-Object { $_.FullName -notmatch "node_modules" } | Select-Object -ExpandProperty FullName
 
                             $allFiles = $backendFiles + $frontendFiles
@@ -76,9 +74,7 @@ pipeline {
         stage('Transfer to VM') {
             steps {
                 bat """
-                    scp -P 22 -o StrictHostKeyChecking=no ^
-                    "%WORKSPACE%\\%ZIP_FILE%" ^
-                    %VM_USER%@%VM_HOST%:%REMOTE_ZIP_PATH%
+                    scp -P 22 "%WORKSPACE%\\%ZIP_FILE%" %VM_USER%@%VM_HOST%:%REMOTE_ZIP_PATH%
                 """
             }
         }
@@ -86,7 +82,7 @@ pipeline {
         stage('Setup and Run Flask on VM') {
             steps {
                 bat """
-                    ssh -o StrictHostKeyChecking=no %VM_USER%@%VM_HOST% ^
+                    ssh %VM_USER%@%VM_HOST% ^
                     "rm -rf %DEPLOY_DIR% && mkdir -p %DEPLOY_DIR% && ^
                      unzip %REMOTE_ZIP_PATH% -d %DEPLOY_DIR% && rm %REMOTE_ZIP_PATH% && ^
                      python3 -m venv %DEPLOY_DIR%/venv && source %DEPLOY_DIR%/venv/bin/activate && ^
@@ -99,9 +95,9 @@ pipeline {
     }
 
     post {
-        // always {
-        //     cleanWs()
-        // }
+        always {
+            cleanWs()
+        }
         success {
             echo '✅ Deployment succeeded!'
         }

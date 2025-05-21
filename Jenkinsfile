@@ -7,8 +7,6 @@ pipeline {
         VM_USER = 'kshitij-necsws'
         VM_HOST = '10.102.192.172'
         ZIP_FILE = 'app_package.zip'
-        SSH_KEY = 'C:\\Users\\kshitij.waikar\\.ssh\\id_rsa.ppk'
-        ZIP_REMOTE_PATH = '/home/kshitij-necsws/Desktop/test_deploy/app_package.zip'
     }
 
     stages {
@@ -74,26 +72,32 @@ pipeline {
 
         stage('Transfer to VM') {
             steps {
-              bat """
-                        pscp -i C:\\Users\\kshitij.waikar\\.ssh\\id_rsa.ppk -q -C C:\\ProgramData\\Jenkins\\.jenkins\\workspace\\deployment\\app_package.zip kshitij-necsws@10.102.192.172:/home/kshitij-necsws/Desktop/test_deploy/app_package.zip
-                """
+                bat '''
+                    pscp -i C:\Users\kshitij.waikar\.ssh\id_rsa.ppk -q -C "C:/ProgramData/Jenkins/.jenkins/workspace/deployment/app_package.zip" kshitij-necsws@10.102.192.172:/home/kshitij-necsws/Desktop/test_deploy/app_package.zip
 
+                '''
             }
         }
 
         stage('Setup and Run Flask on VM (plink)') {
             steps {
                 bat """
-    pscp -v -i "C:\\Users\\kshitij.waikar\\.ssh\\id_rsa.ppk" -C -q ^
-    "C:\\ProgramData\\Jenkins\\.jenkins\\workspace\\deployment\\app_package.zip" ^
-    kshitij-necsws@10.102.192.172:/home/kshitij-necsws/Desktop/test_deploy/app_package.zip
-"""
-
+                    plink -batch %VM_USER%@%VM_HOST% ^
+                    "rm -rf ${DEPLOY_DIR} && mkdir -p ${DEPLOY_DIR} && ^
+                     unzip /tmp/${ZIP_FILE} -d ${DEPLOY_DIR} && rm /tmp/${ZIP_FILE} && ^
+                     python3 -m venv ${DEPLOY_DIR}/venv && source ${DEPLOY_DIR}/venv/bin/activate && ^
+                     cd ${DEPLOY_DIR}/backend && pip install --upgrade pip && pip install -r requirements.txt && ^
+                     export FLASK_APP=app.py && flask db upgrade && ^
+                     nohup flask run --host=0.0.0.0 --port=8000 &"
+                """
             }
         }
     }
 
     post {
+        always {
+            cleanWs()
+        }
         success {
             echo '✅ Deployment succeeded!'
         }

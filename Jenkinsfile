@@ -99,9 +99,9 @@ pipeline {
     }
 
     post {
-        always {
-            cleanWs()
-        }
+        // always {
+        //     cleanWs()
+        // }
         success {
             echo '✅ Deployment succeeded!'
         }

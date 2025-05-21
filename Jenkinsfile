@@ -75,7 +75,7 @@ pipeline {
     steps {
         bat '''
             echo Starting SCP transfer...
-            scp -P 22 -o StrictHostKeyChecking=no ^
+           scp -i "C:\\Users\\kshitij.waikar\\.ssh\\id_rsa" -P 22 -o StrictHostKeyChecking=no ^
                 "%WORKSPACE%\\%ZIP_FILE%" ^
                 %VM_USER%@%VM_HOST%:%REMOTE_ZIP_PATH%
             echo SCP transfer completed.

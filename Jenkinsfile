@@ -71,19 +71,18 @@ pipeline {
             }
         }
 
-  stage('Transfer to VM') {
+stage('Transfer to VM') {
     steps {
         bat '''
             echo Starting SCP transfer...
-          bat '''
-    scp -i "C:\\Users\\kshitij.waikar\\.ssh\\id_rsa" -P 22 ^
-        "%WORKSPACE%\\%ZIP_FILE%" ^
-        %VM_USER%@%VM_HOST%:%REMOTE_ZIP_PATH%
-'''
-
+            scp -P 22 -o StrictHostKeyChecking=no ^
+                "%WORKSPACE%\\%ZIP_FILE%" ^
+                %VM_USER%@%VM_HOST%:%REMOTE_ZIP_PATH%
+            echo SCP transfer completed.
         '''
     }
 }
+
 
         stage('Setup and Run Flask on VM') {
             steps {

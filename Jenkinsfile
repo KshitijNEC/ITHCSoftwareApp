@@ -74,9 +74,10 @@ pipeline {
 
         stage('Transfer to VM') {
             steps {
-                bat """
-                    pscp -i "%SSH_KEY%" -q -C "C:\\ProgramData\\Jenkins\\.jenkins\\workspace\\deployment\\app_package.zip" %VM_USER%@%VM_HOST%:%ZIP_REMOTE_PATH%
+              bat """
+                        pscp -i C:\\Users\\kshitij.waikar\\.ssh\\id_rsa.ppk -q -C C:\\ProgramData\\Jenkins\\.jenkins\\workspace\\deployment\\app_package.zip kshitij-necsws@10.102.192.172:/home/kshitij-necsws/Desktop/test_deploy/app_package.zip
                 """
+
             }
         }
 

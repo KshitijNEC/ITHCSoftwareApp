@@ -75,9 +75,11 @@ pipeline {
     steps {
         bat '''
             echo Starting SCP transfer...
-           scp -i "C:\Users\kshitij.waikar\.ssh\id_rsa" -P 22 ^
-    "C:\ProgramData\Jenkins\.jenkins\workspace\deployment@2\app_package.zip" ^
-    kshitij-necsws@10.102.192.172:/home/kshitij-necsws/Desktop/test_deploy/app_package.zip
+          bat '''
+    scp -i "C:\\Users\\kshitij.waikar\\.ssh\\id_rsa" -P 22 ^
+        "%WORKSPACE%\\%ZIP_FILE%" ^
+        %VM_USER%@%VM_HOST%:%REMOTE_ZIP_PATH%
+'''
 
         '''
     }

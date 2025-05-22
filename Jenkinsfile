@@ -2,84 +2,87 @@ pipeline {
     agent any
 
     environment {
-        GIT_REPO = 'https://github.com/KshitijNEC/ITHCSoftwareApp.git'
-        BRANCH = 'main'
         APP_NAME = 'ithcapp'
-        DEPLOY_DIR = '/home/kshitij-necsws/Desktop/test_deploy'
-        ZIP_FILE = 'app_package.zip'
-        LOCAL_WORKSPACE = 'C:/ProgramData/Jenkins/.jenkins/workspace/deployment'
+        DEPLOY_DIR = '/home/kshitij-necsws/Desktop/deploy_folder'
         VM_USER = 'kshitij-necsws'
         VM_HOST = '10.102.192.172'
-        SSH_KEY = 'ubuntu_vm_access_key'  // ✅ Updated
+        TAR_FILE = 'app_package.tar.gz'
+        SSH_KEY = 'C:\\Users\\kshitij.waikar\\.ssh\\id_rsa'
+        REMOTE_TAR_PATH = '/home/kshitij-necsws/Desktop/test_deploy/app_package.tar.gz'
     }
 
     stages {
-
-        stage('Clone Repository') {
+        stage('Checkout Code') {
             steps {
-                dir("${env.LOCAL_WORKSPACE}") {
-                    git branch: "${env.BRANCH}", url: "${env.GIT_REPO}"
-                }
+                git branch: 'main', url: 'https://github.com/KshitijNEC/ITHCSoftwareApp.git'
             }
         }
 
-        stage('Zip Application') {
+        stage('Install Frontend Dependencies') {
             steps {
-                powershell """
-                    Compress-Archive -Path ${env.LOCAL_WORKSPACE}\\* -DestinationPath ${env.LOCAL_WORKSPACE}\\${env.ZIP_FILE} -Force
+                bat '''
+                    cd frontend
+                    call npm install
+                '''
+                sleep(time: 10, unit: 'SECONDS')
+            }
+        }
+
+        stage('Pre-Zip Cleanup') {
+            steps {
+                powershell '''
+                    if (Test-Path "backend/uploads") {
+                        Remove-Item -Path "backend/uploads/*" -Force -Recurse -ErrorAction SilentlyContinue
+                    }
+                '''
+            }
+        }
+
+        stage('Tar Project') {
+            steps {
+                powershell '''
+                    if (Test-Path "app_package.tar.gz") {
+                        Remove-Item "app_package.tar.gz" -Force
+                    }
+
+                    # Tar backend and frontend, excluding node_modules and .git
+                    tar --exclude="frontend/node_modules" --exclude="**/.git" -czf app_package.tar.gz backend frontend
+                '''
+            }
+        }
+
+        stage('Transfer to VM') {
+            steps {
+                bat """
+                    scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no "%WORKSPACE%\\%TAR_FILE%" %VM_USER%@%VM_HOST%:%REMOTE_TAR_PATH%
                 """
             }
         }
 
-        stage('Transfer ZIP to VM') {
-    steps {
-        script {
-            sshagent(credentials: ["ubuntu_vm_access_key"]) {
-                bat """scp ${LOCAL_WORKSPACE}\\${ZIP_FILE} ${VM_USER}@${VM_HOST}:${DEPLOY_DIR}/"""
-            }
-        }
-    }
-}
-
-
-        stage('Remote Setup & Deploy on VM') {
+        stage('Setup and Run Flask on VM') {
             steps {
-                sshagent(credentials: ["${env.SSH_KEY}"]) {
-                    sh """
-                        ssh ${env.VM_USER}@${env.VM_HOST} << 'ENDSSH'
-                        set -e
-                        cd ${DEPLOY_DIR}
-                        unzip -o ${ZIP_FILE}
-
-                        cd ITHCSoftwareApp
-
-                        # Backend setup
-                        cd backend
-                        python3 -m venv venv
-                        source venv/bin/activate
-                        pip install -r requirements.txt
-                        flask db upgrade
-                        deactivate
-
-                        # Frontend setup
-                        cd ../frontend
-                        npm install
-
-                        echo "Deployment Completed. Start backend manually if needed:"
-                        echo "source ${DEPLOY_DIR}/ITHCSoftwareApp/backend/venv/bin/activate && python -m flask run"
-                        ENDSSH
-                    """
-                }
+                bat """
+                    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %VM_USER%@%VM_HOST% ^
+                    "rm -rf ${DEPLOY_DIR} && mkdir -p ${DEPLOY_DIR} && ^
+                     tar -xzf ${REMOTE_TAR_PATH} -C ${DEPLOY_DIR} && rm ${REMOTE_TAR_PATH} && ^
+                     python3 -m venv ${DEPLOY_DIR}/venv && source ${DEPLOY_DIR}/venv/bin/activate && ^
+                     cd ${DEPLOY_DIR}/backend && pip install --upgrade pip && pip install -r requirements.txt && ^
+                     export FLASK_APP=app.py && flask db upgrade && ^
+                     nohup flask run --host=0.0.0.0 --port=8000 &"
+                """
             }
         }
     }
 
     post {
-        failure {
-            echo "❌ Deployment failed."
+        always {
+            cleanWs()
         }
         success {
-            echo "✅ Deployment successful."
+            echo '✅ Deployment succeeded!'
+        }
+        failure {
+            echo '❌ Deployment failed!'
         }
     }
 }

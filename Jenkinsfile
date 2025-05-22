@@ -54,7 +54,7 @@ pipeline {
         stage('Transfer to VM') {
             steps {
                 bat """
-                    scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no "%WORKSPACE%\\%TAR_FILE%" %VM_USER%@%VM_HOST%:%REMOTE_TAR_PATH%
+                    scp "%SSH_KEY%" -o StrictHostKeyChecking=no "%WORKSPACE%\\%TAR_FILE%" %VM_USER%@%VM_HOST%:%REMOTE_TAR_PATH%
                 """
             }
         }

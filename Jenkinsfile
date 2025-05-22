@@ -32,14 +32,15 @@ pipeline {
         }
 
         stage('Transfer ZIP to VM') {
-            steps {
-                sshagent(credentials: ["${env.SSH_KEY}"]) {
-                    sh """
-                        scp "${env.LOCAL_WORKSPACE}/${env.ZIP_FILE}" ${env.VM_USER}@${env.VM_HOST}:${env.DEPLOY_DIR}/
-                    """
-                }
+    steps {
+        script {
+            sshagent(credentials: ["ubuntu_vm_access_key"]) {
+                bat """scp ${LOCAL_WORKSPACE}\\${ZIP_FILE} ${VM_USER}@${VM_HOST}:${DEPLOY_DIR}/"""
             }
         }
+    }
+}
+
 
         stage('Remote Setup & Deploy on VM') {
             steps {

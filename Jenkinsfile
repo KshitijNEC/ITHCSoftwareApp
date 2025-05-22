@@ -62,10 +62,16 @@ pipeline {
         stage('Setup and Run Flask on VM') {
             steps {
                 bat """
-                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} 'tar -xzf ${REMOTE_TAR_PATH} -C ${DEPLOY_DIR} && cd ${DEPLOY_DIR} && python3 -m venv venv && source venv/bin/activate && cd backend && pip install --upgrade pip && pip install -r requirements.txt && flask db upgrade && python -m flask run --host=0.0.0.0 --port=5000'"
+                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} 'tar -xzf ${REMOTE_TAR_PATH} -C ${DEPLOY_DIR} && cd ${DEPLOY_DIR} && python3 -m venv venv && source venv/bin/activate && cd backend && pip install --upgrade pip && pip install -r requirements.txt && flask db upgrade'"
                 """
             }
         }
+         stage('Run Flask on VM') {
+            steps {
+                bat """
+                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} 'cd ${DEPLOY_DIR}/backend && python -m flask run --host=0.0.0.0 --port=5000'"
+                """
+            }
     }
 
     post {

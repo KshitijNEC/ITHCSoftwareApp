@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         APP_NAME = 'ithcapp'
-        DEPLOY_DIR = '/home/kshitij-necsws/Desktop/deploy_folder'
+        DEPLOY_DIR = '/home/kshitij-necsws/Desktop/test_deploy'
         VM_USER = 'kshitij-necsws'
         VM_HOST = '10.102.192.172'
         TAR_FILE = 'app_package.tar.gz'
@@ -54,7 +54,7 @@ pipeline {
         stage('Transfer to VM') {
             steps {
                 bat """
-                    "%GIT_BASH%" -c "scp -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no /c/ProgramData/Jenkins/.jenkins/workspace/deployment/app_package.tar.gz kshitij-necsws@10.102.192.172:/home/kshitij-necsws/Desktop/test_deploy/app_package.tar.gz"
+                    "%GIT_BASH%" -c "scp -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no /c/ProgramData/Jenkins/.jenkins/workspace/deployment/app_package.tar.gz ${VM_USER}@${VM_HOST}:${REMOTE_TAR_PATH}"
                 """
             }
         }
@@ -62,11 +62,11 @@ pipeline {
         stage('Setup and Run Flask on VM') {
             steps {
                 bat """
-                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no kshitij-necsws@10.102.192.172 'rm -rf ${DEPLOY_DIR} && mkdir -p ${DEPLOY_DIR} && tar -xzf ${REMOTE_TAR_PATH} -C ${DEPLOY_DIR} && rm ${REMOTE_TAR_PATH} && python3 -m venv ${DEPLOY_DIR}/venv && source ${DEPLOY_DIR}/venv/bin/activate && cd ${DEPLOY_DIR}/backend && pip install --upgrade pip && pip install -r requirements.txt && export FLASK_APP=app.py && flask db upgrade && nohup python -m flask run --host=0.0.0.0 --port=8000 &'"
+                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} 'tar -xzf ${REMOTE_TAR_PATH} -C ${DEPLOY_DIR} && cd ${DEPLOY_DIR} && python3 -m venv venv && source venv/bin/activate && cd backend && pip install --upgrade pip && pip install -r requirements.txt && flask db upgrade && cd ../frontend && npm install && cd ../backend && nohup python -m flask run --host=0.0.0.0 --port=5000 &'"
                 """
             }
         }
-    } // <--- THIS was missing
+    }
 
     post {
         always {

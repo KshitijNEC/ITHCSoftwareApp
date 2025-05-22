@@ -9,6 +9,7 @@ pipeline {
         TAR_FILE = 'app_package.tar.gz'
         SSH_KEY = 'C:\\Users\\kshitij.waikar\\.ssh\\id_rsa'
         REMOTE_TAR_PATH = '/home/kshitij-necsws/Desktop/test_deploy/app_package.tar.gz'
+        GIT_BASH = 'C:\\Users\\kshitij.waikar\\AppData\\Local\\Programs\\Git\\git-bash.exe'
     }
 
     stages {
@@ -54,7 +55,7 @@ pipeline {
         stage('Transfer to VM') {
             steps {
                 bat """
-                    scp "%SSH_KEY%" -o StrictHostKeyChecking=no "%WORKSPACE%\\%TAR_FILE%" %VM_USER%@%VM_HOST%:%REMOTE_TAR_PATH%
+                    "%GIT_BASH%" -c "scp -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no /c/ProgramData/Jenkins/.jenkins/workspace/deployment/app_package.tar.gz kshitij-necsws@10.102.192.172:/home/kshitij-necsws/Desktop/test_deploy/app_package.tar.gz"
                 """
             }
         }
@@ -62,13 +63,13 @@ pipeline {
         stage('Setup and Run Flask on VM') {
             steps {
                 bat """
-                    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %VM_USER%@%VM_HOST% ^
-                    "rm -rf ${DEPLOY_DIR} && mkdir -p ${DEPLOY_DIR} && ^
-                     tar -xzf ${REMOTE_TAR_PATH} -C ${DEPLOY_DIR} && rm ${REMOTE_TAR_PATH} && ^
-                     python3 -m venv ${DEPLOY_DIR}/venv && source ${DEPLOY_DIR}/venv/bin/activate && ^
-                     cd ${DEPLOY_DIR}/backend && pip install --upgrade pip && pip install -r requirements.txt && ^
-                     export FLASK_APP=app.py && flask db upgrade && ^
-                     nohup flask run --host=0.0.0.0 --port=8000 &"
+                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no kshitij-necsws@10.102.192.172 \\
+                    'rm -rf ${DEPLOY_DIR} && mkdir -p ${DEPLOY_DIR} && \\
+                     tar -xzf ${REMOTE_TAR_PATH} -C ${DEPLOY_DIR} && rm ${REMOTE_TAR_PATH} && \\
+                     python3 -m venv ${DEPLOY_DIR}/venv && source ${DEPLOY_DIR}/venv/bin/activate && \\
+                     cd ${DEPLOY_DIR}/backend && pip install --upgrade pip && pip install -r requirements.txt && \\
+                     export FLASK_APP=app.py && flask db upgrade && \\
+                     nohup flask run --host=0.0.0.0 --port=8000 &'"
                 """
             }
         }

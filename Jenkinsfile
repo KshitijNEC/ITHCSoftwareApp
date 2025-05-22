@@ -2,78 +2,83 @@ pipeline {
     agent any
 
     environment {
-        VM_USER = 'kshitij-necsws'
-        VM_HOST = '10.102.192.172'
+        GIT_REPO = 'https://github.com/KshitijNEC/ITHCSoftwareApp.git'
+        BRANCH = 'main'
+        APP_NAME = 'ithcapp'
         DEPLOY_DIR = '/home/kshitij-necsws/Desktop/test_deploy'
         ZIP_FILE = 'app_package.zip'
+        LOCAL_WORKSPACE = 'C:/ProgramData/Jenkins/.jenkins/workspace/deployment'
+        VM_USER = 'kshitij-necsws'
+        VM_HOST = '10.102.192.172'
+        SSH_KEY = 'jenkins-deploy-key'
     }
 
     stages {
-        stage('Checkout Code') {
+
+        stage('Clone Repository') {
             steps {
-                git branch: 'main', url: 'https://github.com/KshitijNEC/ITHCSoftwareApp.git'
+                dir("${env.LOCAL_WORKSPACE}") {
+                    git branch: "${env.BRANCH}", url: "${env.GIT_REPO}"
+                }
             }
         }
 
-        stage('Zip Entire Project') {
+        stage('Zip Application') {
             steps {
-                powershell '''
-                    $zipPath = "app_package.zip"
-                    if (Test-Path $zipPath) { Remove-Item $zipPath }
-
-                    # Exclude backend/tests folder
-                    $filesToZip = Get-ChildItem -Recurse -File | Where-Object { $_.FullName -notmatch '\\\\backend\\\\tests\\\\' } | Select-Object -ExpandProperty FullName
-
-                    Compress-Archive -Path $filesToZip -DestinationPath $zipPath -Force
-                '''
+                powershell """
+                    Compress-Archive -Path ${env.LOCAL_WORKSPACE}\\* -DestinationPath ${env.LOCAL_WORKSPACE}\\${env.ZIP_FILE} -Force
+                """
             }
         }
 
-        stage('Transfer to VM via SCP') {
+        stage('Transfer ZIP to VM') {
             steps {
-                powershell '''
-                    $source = "$env:WORKSPACE\\app_package.zip"
-                    $target = "$env:VM_USER@$env:VM_HOST:$env:DEPLOY_DIR/"
-                    Write-Host "📤 Sending $source to $target ..."
-                    scp $source $target
-                '''
+                sshagent(credentials: ["${env.SSH_KEY}"]) {
+                    sh """
+                        scp "${env.LOCAL_WORKSPACE}/${env.ZIP_FILE}" ${env.VM_USER}@${env.VM_HOST}:${env.DEPLOY_DIR}/
+                    """
+                }
             }
         }
 
-        stage('Unzip and Run on VM') {
+        stage('Remote Setup & Deploy on VM') {
             steps {
-                powershell '''
-                    $user = $env:VM_USER
-                    $host = $env:VM_HOST
-                    $deployDir = $env:DEPLOY_DIR
-                    $zipFile = $env:ZIP_FILE
+                sshagent(credentials: ["${env.SSH_KEY}"]) {
+                    sh """
+                        ssh ${env.VM_USER}@${env.VM_HOST} << 'ENDSSH'
+                        set -e
+                        cd ${DEPLOY_DIR}
+                        unzip -o ${ZIP_FILE}
 
-                    $sshCmd = @"
-                        cd $deployDir
-                        unzip -o $zipFile
-                        rm $zipFile
-                        python3 -m venv venv
-                        . venv/bin/activate
+                        cd ITHCSoftwareApp
+
+                        # Backend setup
                         cd backend
-                        pip install --upgrade pip
+                        python3 -m venv venv
+                        source venv/bin/activate
                         pip install -r requirements.txt
-                        export FLASK_APP=app.py
                         flask db upgrade
-                        nohup flask run --host=0.0.0.0 --port=8000 &
-                    "@
+                        deactivate
 
-                    ssh $user@$host "$sshCmd"
-                '''
+                        # Frontend setup
+                        cd ../frontend
+                        npm install
+
+                        echo "Deployment Completed. Start backend manually if needed:"
+                        echo "source ${DEPLOY_DIR}/ITHCSoftwareApp/backend/venv/bin/activate && python -m flask run"
+                        ENDSSH
+                    """
+                }
             }
         }
     }
 
     post {
-        success {
-            echo '✅ Deployment succeeded!'
-        }
         failure {
-            echo '❌ Deployment failed!'
+            echo "❌ Deployment failed."
+        }
+        success {
+            echo "✅ Deployment successful."
         }
     }
 }

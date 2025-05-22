@@ -15,26 +15,26 @@ pipeline {
             }
         }
 
-       stage('Zip Entire Project') {
-    steps {
-        powershell '''
-            $zipPath = "app_package.zip"
-            if (Test-Path $zipPath) { Remove-Item $zipPath }
+        stage('Zip Entire Project') {
+            steps {
+                powershell '''
+                    $zipPath = "app_package.zip"
+                    if (Test-Path $zipPath) { Remove-Item $zipPath }
 
-            $filesToZip = Get-ChildItem -Recurse -File | Where-Object { $_.FullName -notmatch '\\\\backend\\\\tests\\\\' } | Select-Object -ExpandProperty FullName
+                    # Exclude backend/tests folder
+                    $filesToZip = Get-ChildItem -Recurse -File | Where-Object { $_.FullName -notmatch '\\\\backend\\\\tests\\\\' } | Select-Object -ExpandProperty FullName
 
-            Compress-Archive -Path $filesToZip -DestinationPath $zipPath -Force
-        '''
-    }
-}
-
+                    Compress-Archive -Path $filesToZip -DestinationPath $zipPath -Force
+                '''
+            }
+        }
 
         stage('Transfer to VM via SCP') {
             steps {
                 powershell '''
-                    $source = "C:/ProgramData/Jenkins/.jenkins/workspace/deployment/app_package.zip"
-                    $target = "${env.VM_USER}@${env.VM_HOST}:${env.DEPLOY_DIR}/"
-                    Write-Host "📤 Sending $source to $target..."
+                    $source = "$env:WORKSPACE\\app_package.zip"
+                    $target = "$env:VM_USER@$env:VM_HOST:$env:DEPLOY_DIR/"
+                    Write-Host "📤 Sending $source to $target ..."
                     scp $source $target
                 '''
             }
@@ -43,12 +43,17 @@ pipeline {
         stage('Unzip and Run on VM') {
             steps {
                 powershell '''
-                    ssh ${env.VM_USER}@${env.VM_HOST} @"
-                        cd ${env.DEPLOY_DIR}
-                        unzip -o app_package.zip
-                        rm app_package.zip
+                    $user = $env:VM_USER
+                    $host = $env:VM_HOST
+                    $deployDir = $env:DEPLOY_DIR
+                    $zipFile = $env:ZIP_FILE
+
+                    $sshCmd = @"
+                        cd $deployDir
+                        unzip -o $zipFile
+                        rm $zipFile
                         python3 -m venv venv
-                        source venv/bin/activate
+                        . venv/bin/activate
                         cd backend
                         pip install --upgrade pip
                         pip install -r requirements.txt
@@ -56,15 +61,14 @@ pipeline {
                         flask db upgrade
                         nohup flask run --host=0.0.0.0 --port=8000 &
                     "@
+
+                    ssh $user@$host "$sshCmd"
                 '''
             }
         }
     }
 
     post {
-        // always {
-        //     cleanWs()
-        // }
         success {
             echo '✅ Deployment succeeded!'
         }

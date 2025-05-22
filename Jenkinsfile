@@ -7,7 +7,6 @@ pipeline {
         VM_USER = 'kshitij-necsws'
         VM_HOST = '10.102.192.172'
         ZIP_FILE = 'app_package.zip'
-        REMOTE_ZIP_PATH = '/home/kshitij-necsws/Desktop/test_deploy/app_package.zip'
     }
 
     stages {
@@ -71,27 +70,22 @@ pipeline {
             }
         }
 
-stage('Transfer to VM') {
-    steps {
-        bat '''
-            echo Starting SCP transfer...
-            scp -P 22 -o StrictHostKeyChecking=no ^
-                "%WORKSPACE%\\%ZIP_FILE%" ^
-                %VM_USER%@%VM_HOST%:%REMOTE_ZIP_PATH%
-            echo SCP transfer completed.
-        '''
-    }
-}
+        stage('Transfer to VM') {
+            steps {
+                bat '''
+                    pscp -q -C C:/ProgramData/Jenkins/.jenkins/workspace/deployment/app_package.zip kshitij-necsws@10.102.192.172:/tmp/app_package.zip
+                '''
+            }
+        }
 
-
-        stage('Setup and Run Flask on VM') {
+        stage('Setup and Run Flask on VM (plink)') {
             steps {
                 bat """
-                    ssh %VM_USER%@%VM_HOST% ^
-                    "rm -rf %DEPLOY_DIR% && mkdir -p %DEPLOY_DIR% && ^
-                     unzip %REMOTE_ZIP_PATH% -d %DEPLOY_DIR% && rm %REMOTE_ZIP_PATH% && ^
-                     python3 -m venv %DEPLOY_DIR%/venv && source %DEPLOY_DIR%/venv/bin/activate && ^
-                     cd %DEPLOY_DIR%/backend && pip install --upgrade pip && pip install -r requirements.txt && ^
+                    plink -batch %VM_USER%@%VM_HOST% ^
+                    "rm -rf ${DEPLOY_DIR} && mkdir -p ${DEPLOY_DIR} && ^
+                     unzip /tmp/${ZIP_FILE} -d ${DEPLOY_DIR} && rm /tmp/${ZIP_FILE} && ^
+                     python3 -m venv ${DEPLOY_DIR}/venv && source ${DEPLOY_DIR}/venv/bin/activate && ^
+                     cd ${DEPLOY_DIR}/backend && pip install --upgrade pip && pip install -r requirements.txt && ^
                      export FLASK_APP=app.py && flask db upgrade && ^
                      nohup flask run --host=0.0.0.0 --port=8000 &"
                 """
@@ -100,9 +94,9 @@ stage('Transfer to VM') {
     }
 
     post {
-        always {
-            cleanWs()
-        }
+        // always {
+        //     cleanWs()
+        // }
         success {
             echo '✅ Deployment succeeded!'
         }

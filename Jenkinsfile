@@ -62,25 +62,7 @@ pipeline {
         stage('Setup and Run Flask on VM') {
             steps {
                 bat """
-                    stage('Setup and Run Flask on VM') {
-    steps {
-        bat """
-            "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} '
-                tar -xzf ${REMOTE_TAR_PATH} -C ${DEPLOY_DIR} &&
-                cd ${DEPLOY_DIR} &&
-                python3 -m venv venv &&
-                ${DEPLOY_DIR}/venv/bin/pip install --upgrade pip &&
-                ${DEPLOY_DIR}/venv/bin/pip install -r ${DEPLOY_DIR}/backend/requirements.txt &&
-                cd ${DEPLOY_DIR}/backend &&
-                ${DEPLOY_DIR}/venv/bin/flask db upgrade &&
-                cd ${DEPLOY_DIR}/frontend &&
-                npm install &&
-                cd ${DEPLOY_DIR}/backend &&
-                nohup ${DEPLOY_DIR}/venv/bin/python -m flask run --host=0.0.0.0 --port=5000 > ${DEPLOY_DIR}/flask.log 2>&1 &'"
-        """
-    }
-}
-
+                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} 'tar -xzf ${REMOTE_TAR_PATH} -C ${DEPLOY_DIR} && cd ${DEPLOY_DIR} && python3 -m venv venv && source venv/bin/activate && cd backend && pip install --upgrade pip && pip install -r requirements.txt && flask db upgrade && cd ../frontend && npm install && cd ../backend && nohup python -m flask run --host=0.0.0.0 --port=5000 &'"
                 """
             }
         }

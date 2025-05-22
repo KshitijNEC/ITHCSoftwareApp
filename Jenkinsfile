@@ -2,10 +2,9 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME = 'ithcapp'
-        DEPLOY_DIR = '/home/kshitij-necsws/Desktop/deploy_folder'
         VM_USER = 'kshitij-necsws'
         VM_HOST = '10.102.192.172'
+        DEPLOY_DIR = '/home/kshitij-necsws/Desktop/test_deploy'
         ZIP_FILE = 'app_package.zip'
     }
 
@@ -16,87 +15,53 @@ pipeline {
             }
         }
 
-        stage('Install Frontend Dependencies') {
-            steps {
-                bat '''
-                    cd frontend
-                    call npm install
-                '''
-                sleep(time: 10, unit: 'SECONDS')
-            }
-        }
-
-        stage('Pre-Zip Cleanup') {
+        stage('Zip Entire Project') {
             steps {
                 powershell '''
-                    if (Test-Path "backend/uploads") {
-                        Remove-Item -Path "backend/uploads/*" -Force -Recurse -ErrorAction SilentlyContinue
-                    }
+                    $zipPath = "app_package.zip"
+                    if (Test-Path $zipPath) { Remove-Item $zipPath }
+
+                    Compress-Archive -Path * -DestinationPath $zipPath -Force
                 '''
             }
         }
 
-        stage('Zip Project') {
+        stage('Transfer to VM via SCP') {
             steps {
                 powershell '''
-                    $zipSuccess = $false
-                    $attempts = 0
-
-                    while (-not $zipSuccess -and $attempts -lt 3) {
-                        try {
-                            if (Test-Path "app_package.zip") {
-                                Remove-Item "app_package.zip"
-                            }
-
-                            $backendFiles = Get-ChildItem -Path "backend" -Recurse -File | Select-Object -ExpandProperty FullName
-                            $frontendFiles = Get-ChildItem -Path "frontend" -Recurse -File | Where-Object { $_.FullName -notmatch "node_modules" } | Select-Object -ExpandProperty FullName
-
-                            $allFiles = $backendFiles + $frontendFiles
-
-                            Compress-Archive -Path $allFiles -DestinationPath "app_package.zip"
-
-                            $zipSuccess = $true
-                        } catch {
-                            Write-Host "Compress-Archive failed, retrying in 5 seconds..."
-                            Start-Sleep -Seconds 5
-                            $attempts++
-                        }
-                    }
-
-                    if (-not $zipSuccess) {
-                        throw "Compress-Archive failed after multiple attempts."
-                    }
+                    $source = "C:/ProgramData/Jenkins/.jenkins/workspace/deployment/app_package.zip"
+                    $target = "${env.VM_USER}@${env.VM_HOST}:${env.DEPLOY_DIR}/"
+                    Write-Host "📤 Sending $source to $target..."
+                    scp $source $target
                 '''
             }
         }
 
-        stage('Transfer to VM') {
+        stage('Unzip and Run on VM') {
             steps {
-                bat '''
-                    pscp -q -C C:/ProgramData/Jenkins/.jenkins/workspace/deployment/app_package.zip kshitij-necsws@10.102.192.172:/tmp/app_package.zip
+                powershell '''
+                    ssh ${env.VM_USER}@${env.VM_HOST} @"
+                        cd ${env.DEPLOY_DIR}
+                        unzip -o app_package.zip
+                        rm app_package.zip
+                        python3 -m venv venv
+                        source venv/bin/activate
+                        cd backend
+                        pip install --upgrade pip
+                        pip install -r requirements.txt
+                        export FLASK_APP=app.py
+                        flask db upgrade
+                        nohup flask run --host=0.0.0.0 --port=8000 &
+                    "@
                 '''
-            }
-        }
-
-        stage('Setup and Run Flask on VM (plink)') {
-            steps {
-                bat """
-                    plink -batch %VM_USER%@%VM_HOST% ^
-                    "rm -rf ${DEPLOY_DIR} && mkdir -p ${DEPLOY_DIR} && ^
-                     unzip /tmp/${ZIP_FILE} -d ${DEPLOY_DIR} && rm /tmp/${ZIP_FILE} && ^
-                     python3 -m venv ${DEPLOY_DIR}/venv && source ${DEPLOY_DIR}/venv/bin/activate && ^
-                     cd ${DEPLOY_DIR}/backend && pip install --upgrade pip && pip install -r requirements.txt && ^
-                     export FLASK_APP=app.py && flask db upgrade && ^
-                     nohup flask run --host=0.0.0.0 --port=8000 &"
-                """
             }
         }
     }
 
     post {
-        // always {
-        //     cleanWs()
-        // }
+        always {
+            cleanWs()
+        }
         success {
             echo '✅ Deployment succeeded!'
         }

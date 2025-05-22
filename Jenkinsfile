@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         APP_NAME = 'ithcapp'
-        DEPLOY_DIR = '/home/kshitij-necsws/Desktop/deploy_folder'
+        DEPLOY_DIR = '/home/kshitij-necsws/Desktop/test_deploy'
         VM_USER = 'kshitij-necsws'
         VM_HOST = '10.102.192.172'
         TAR_FILE = 'app_package.tar.gz'

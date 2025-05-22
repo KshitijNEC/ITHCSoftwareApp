@@ -10,7 +10,7 @@ pipeline {
         LOCAL_WORKSPACE = 'C:/ProgramData/Jenkins/.jenkins/workspace/deployment'
         VM_USER = 'kshitij-necsws'
         VM_HOST = '10.102.192.172'
-        SSH_KEY = 'jenkins-deploy-key'
+        SSH_KEY = 'ubuntu_vm_access_key'  // ✅ Updated
     }
 
     stages {

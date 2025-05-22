@@ -72,6 +72,7 @@ pipeline {
                     "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} 'cd ${DEPLOY_DIR}/backend && python -m flask run --host=0.0.0.0 --port=5000'"
                 """
             }
+         }
     }
 
     post {

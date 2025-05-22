@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         APP_NAME = 'ithcapp'
-        DEPLOY_DIR = '/home/kshitij-necsws/Desktop/test_deploy'
+        DEPLOY_DIR = '/home/kshitij-necsws/Desktop/deploy_folder'
         VM_USER = 'kshitij-necsws'
         VM_HOST = '10.102.192.172'
         TAR_FILE = 'app_package.tar.gz'
@@ -62,14 +62,14 @@ pipeline {
 
         stage('Setup and Run Flask on VM') {
             steps {
-                bat """
-                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no kshitij-necsws@10.102.192.172 \\
-                    'rm -rf ${DEPLOY_DIR} && mkdir -p ${DEPLOY_DIR} && \\
-                     tar -xzf ${REMOTE_TAR_PATH} -C ${DEPLOY_DIR} && rm ${REMOTE_TAR_PATH} && \\
+                sh """
+                    "${GIT_BASH}" -c \\
+                    "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} \\
+                    'tar -xzf ${REMOTE_TAR_PATH} -C ${DEPLOY_DIR} && rm ${REMOTE_TAR_PATH} && \\
                      python3 -m venv ${DEPLOY_DIR}/venv && source ${DEPLOY_DIR}/venv/bin/activate && \\
                      cd ${DEPLOY_DIR}/backend && pip install --upgrade pip && pip install -r requirements.txt && \\
                      export FLASK_APP=app.py && flask db upgrade && \\
-                     nohup flask run --host=0.0.0.0 --port=8000 &'"
+                     nohup flask run --host=0.0.0.0 --port=8000 > flask.log 2>&1 &'"
                 """
             }
         }

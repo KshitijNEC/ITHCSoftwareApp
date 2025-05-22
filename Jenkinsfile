@@ -15,16 +15,19 @@ pipeline {
             }
         }
 
-        stage('Zip Entire Project') {
-            steps {
-                powershell '''
-                    $zipPath = "app_package.zip"
-                    if (Test-Path $zipPath) { Remove-Item $zipPath }
+       stage('Zip Entire Project') {
+    steps {
+        powershell '''
+            $zipPath = "app_package.zip"
+            if (Test-Path $zipPath) { Remove-Item $zipPath }
 
-                    Compress-Archive -Path * -DestinationPath $zipPath -Force
-                '''
-            }
-        }
+            $filesToZip = Get-ChildItem -Recurse -File | Where-Object { $_.FullName -notmatch '\\\\backend\\\\tests\\\\' } | Select-Object -ExpandProperty FullName
+
+            Compress-Archive -Path $filesToZip -DestinationPath $zipPath -Force
+        '''
+    }
+}
+
 
         stage('Transfer to VM via SCP') {
             steps {

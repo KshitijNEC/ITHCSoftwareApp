@@ -29,6 +29,21 @@ pipeline {
             }
         }
 
+                stage('Run Tests') {
+            steps {
+                bat '''
+                    REMEMBER=%CD%
+                    cd backend
+                    call venv\\Scripts\\activate
+                    python -m pip install -r requirements.txt
+                    python -m pytest --cov=. --cov-report=html:coverage-report
+                    cd %REMEMBER%\\frontend
+                    call npm test -- --coverage
+                '''
+            }
+        }
+
+
         stage('Pre-Zip Cleanup') {
             steps {
                 powershell '''

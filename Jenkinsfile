@@ -29,20 +29,7 @@ pipeline {
             }
         }
 
-                stage('Run Tests') {
-            steps {
-                bat '''
-                    REMEMBER=%CD%
-                    cd backend
-                    call venv\\Scripts\\activate
-                    python -m pip install -r requirements.txt
-                    python -m pytest --cov=. --cov-report=html:coverage-report
-                    cd %REMEMBER%\\frontend
-                    call npm test -- --coverage
-                '''
-            }
-        }
-
+               
 
         stage('Pre-Zip Cleanup') {
             steps {
@@ -74,13 +61,20 @@ pipeline {
             }
         }
 
-        stage('Setup and Run Flask on VM') {
+         stage('Run Tests') {
             steps {
-                bat """
-                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} 'tar -xzf ${REMOTE_TAR_PATH} -C ${DEPLOY_DIR} && cd ${DEPLOY_DIR} && python3 -m venv venv && source venv/bin/activate && cd backend && pip install --upgrade pip && pip install -r requirements.txt && flask db upgrade'"
-                """
+                bat '''
+                    REMEMBER=%CD%
+                    cd backend
+                    call venv\\Scripts\\activate
+                    python -m pip install -r requirements.txt
+                    python -m pytest --cov=. --cov-report=html:coverage-report
+                    cd %REMEMBER%\\frontend
+                    call npm test -- --coverage
+                '''
             }
         }
+
          stage('Run Flask on VM') {
             steps {
                 bat """

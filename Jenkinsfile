@@ -59,11 +59,27 @@ pipeline {
             }
         }
 
-        stage('Setup, Test, and Prepare Flask on VM') {
+        stage('Setup Flask on VM') {
             steps {
                 bat """
-                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} 'tar -xzf ${REMOTE_TAR_PATH} -C ${DEPLOY_DIR} && cd ${DEPLOY_DIR} && python3 -m venv venv && source venv/bin/activate && pip install --upgrade pip && pip install -r backend/requirements.txt && cd backend && flask db upgrade && python -m pytest --cov=. --cov-report=html:coverage-report && cd ../frontend && npm install && npm test -- --coverage'"
+                    "%GIT_BASH%" -c "ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} 'tar -xzf ${REMOTE_TAR_PATH} -C ${DEPLOY_DIR} && cd ${DEPLOY_DIR} && python3 -m venv venv && source venv/bin/activate && pip install --upgrade pip && pip install -r backend/requirements.txt && cd backend && flask db upgrade'"
                 """
+            }
+        }
+
+        stage('Run Backend and Frontend Tests') {
+            steps {
+                bat """
+                    "%GIT_BASH%" -c "ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} 'source ${DEPLOY_DIR}/venv/bin/activate && cd ${DEPLOY_DIR}/backend && python -m pytest --cov=. --cov-report=html:coverage-report && cd ../frontend && npm install && npm test -- --coverage'"
+                """
+            }
+            post {
+                success {
+                    echo '✅ All tests passed!'
+                }
+                failure {
+                    echo '❌ Tests failed!'
+                }
             }
         }
 

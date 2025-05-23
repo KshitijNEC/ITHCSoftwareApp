@@ -59,12 +59,14 @@ pipeline {
             }
         }
 
-        stage('Setup and Run Flask on VM') {
-            steps {
-                bat """
-                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKey-Checking=no ${VM_USER}@${VM_HOST} 'tar -xzf ${REMOTE_TAR_PATH} -C ${DE-PLOY_DIR} && cd ${DEPLOY_DIR} && python3 -m venv venv && source venv/bin/activate && cd backend && pip install --upgrade pip && pip install -r requirements.txt && flask db upgrade'"
-                """
-            }
+      stage('Setup, Test, and Prepare Flask on VM') {
+    steps {
+        bat """
+            "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} 'tar -xzf ${REMOTE_TAR_PATH} -C ${DEPLOY_DIR} && cd ${DEPLOY_DIR} && python3 -m venv venv && source venv/bin/activate && pip install --upgrade pip && pip install -r backend/requirements.txt && cd backend && flask db upgrade && python -m pytest --cov=. --cov-report=html:coverage-report && cd ../frontend && npm install && npm test -- --coverage'"
+        """
+    }
+}
+
         }
          stage('Run Flask on VM') {
             steps {

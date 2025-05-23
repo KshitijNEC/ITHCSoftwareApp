@@ -83,10 +83,10 @@ pipeline {
             }
         }
 
-        stage('Run Flask on VM') {
+        stage('Restart Flask Service') {
             steps {
                 bat """
-                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} 'cd ${DEPLOY_DIR}/backend && python -m flask run --host=0.0.0.0 --port=5000'"
+                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} 'sudo systemctl restart ithcapp'"
                 """
             }
         }

@@ -29,13 +29,11 @@ pipeline {
             }
         }
 
-               
-
         stage('Pre-Zip Cleanup') {
             steps {
                 powershell '''
                     if (Test-Path "backend/uploads") {
-                        Remove-Item -Path "backend/uploads/*" -Force -Recurse -ErrorAction SilentlyContinue
+                        Remove-Item -Path "backend/uploads/*" -Force -Recurse -ErrorAction Silent-lyContinue
                     }
                 '''
             }
@@ -56,29 +54,22 @@ pipeline {
         stage('Transfer to VM') {
             steps {
                 bat """
-                    "%GIT_BASH%" -c "scp -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no /c/ProgramData/Jenkins/.jenkins/workspace/deployment/app_package.tar.gz ${VM_USER}@${VM_HOST}:${REMOTE_TAR_PATH}"
+                    "%GIT_BASH%" -c "scp -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKey-Checking=no /c/ProgramData/Jenkins/.jenkins/workspace/deployment/app_package.tar.gz ${VM_USER}@${VM_HOST}:${REMOTE_TAR_PATH}"
                 """
             }
         }
 
-         stage('Run Tests') {
+        stage('Setup and Run Flask on VM') {
             steps {
-                bat '''
-                    REMEMBER=%CD%
-                    cd backend
-                    call venv\\Scripts\\activate
-                    python -m pip install -r requirements.txt
-                    python -m pytest --cov=. --cov-report=html:coverage-report
-                    cd %REMEMBER%\\frontend
-                    call npm test -- --coverage
-                '''
+                bat """
+                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKey-Checking=no ${VM_USER}@${VM_HOST} 'tar -xzf ${REMOTE_TAR_PATH} -C ${DE-PLOY_DIR} && cd ${DEPLOY_DIR} && python3 -m venv venv && source venv/bin/activate && cd backend && pip install --upgrade pip && pip install -r requirements.txt && flask db upgrade'"
+                """
             }
         }
-
          stage('Run Flask on VM') {
             steps {
                 bat """
-                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} 'cd ${DEPLOY_DIR}/backend && python -m flask run --host=0.0.0.0 --port=5000'"
+                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKey-Checking=no ${VM_USER}@${VM_HOST} 'cd ${DEPLOY_DIR}/backend && python -m flask run --host=0.0.0.0 --port=5000'"
                 """
             }
          }

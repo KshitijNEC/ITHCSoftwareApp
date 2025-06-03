@@ -3,12 +3,12 @@ pipeline {
 
     environment {
         APP_NAME = 'ithcapp'
-        DEPLOY_DIR = '/home/kshitij-necsws/Desktop/test_deploy'
-        VM_USER = 'kshitij-necsws'
-        VM_HOST = '10.102.192.172'
+        DEPLOY_DIR = '/home/groot/Desktop/test_deploy'
+        VM_USER = 'groot'
+        VM_HOST = '10.102.194.102'
         TAR_FILE = 'app_package.tar.gz'
         SSH_KEY = 'C:\\Users\\kshitij.waikar\\.ssh\\id_rsa'
-        REMOTE_TAR_PATH = '/home/kshitij-necsws/Desktop/test_deploy/app_package.tar.gz'
+        REMOTE_TAR_PATH = '/home/groot/Desktop/test_deploy/app_package.tar.gz'
         GIT_BASH = 'C:\\Users\\kshitij.waikar\\AppData\\Local\\Programs\\Git\\git-bash.exe'
     }
 
@@ -86,7 +86,7 @@ pipeline {
         stage('Restart Flask Service') {
             steps {
                 bat """
-                    "%GIT_BASH%" -c "ssh -i /c/Users/kshitij.waikar/.ssh/id_rsa -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} 'sudo systemctl restart ithcapp'"
+                    "%GIT_BASH%" -c "ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no ${VM_USER}@${VM_HOST} 'sudo systemctl restart ithcapp'"
                 """
             }
         }
